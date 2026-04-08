@@ -8,7 +8,7 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, nativeImage } from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readdir, mkdir, readFile, writeFile, access } from 'node:fs/promises';
+import { readdir, mkdir, readFile, writeFile, access, stat } from 'node:fs/promises';
 import { createServer, type ServerOptions } from '../src/api/server.js';
 import { ingest } from '../src/ingest/index.js';
 import { Wallet } from '../src/payment/wallet.js';
@@ -226,6 +226,37 @@ function setupIPC() {
     if (!config) return;
     config.contentFolders = config.contentFolders.filter(f => f !== folder);
     await saveConfig(config);
+  });
+
+  // List all media files across content folders
+  ipcMain.handle('list-media', async () => {
+    if (!config) return [];
+    const MEDIA_EXTS = ['.mp4', '.mkv', '.mov', '.avi', '.mp3', '.m4a', '.flac', '.wav', '.webm'];
+    const files: Array<{ name: string; folder: string; path: string; size: number; ext: string }> = [];
+
+    for (const folder of config.contentFolders) {
+      try {
+        const entries = await readdir(folder, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isFile()) continue;
+          const ext = entry.name.substring(entry.name.lastIndexOf('.')).toLowerCase();
+          if (!MEDIA_EXTS.includes(ext)) continue;
+          const fullPath = join(folder, entry.name);
+          try {
+            const s = await stat(fullPath);
+            files.push({
+              name: entry.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
+              folder,
+              path: fullPath,
+              size: s.size,
+              ext: ext.substring(1).toUpperCase(),
+            });
+          } catch {}
+        }
+      } catch {}
+    }
+
+    return files.sort((a, b) => a.name.localeCompare(b.name));
   });
 
   // Regenerate wallet keypair

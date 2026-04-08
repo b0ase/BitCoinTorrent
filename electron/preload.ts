@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld('bitcointorrent', {
   addFolder: () => ipcRenderer.invoke('add-folder'),
   removeFolder: (f: string) => ipcRenderer.invoke('remove-folder', f),
   regenWallet: (which: string) => ipcRenderer.invoke('regen-wallet', which),
+  listMedia: () => ipcRenderer.invoke('list-media'),
 });
