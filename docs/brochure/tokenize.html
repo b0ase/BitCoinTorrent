@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BitCoinTorrent — Content Tokenization</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #fff; color: #111; }
+    header { padding: 2.5rem 3rem 2rem; border-bottom: 2px solid #000; }
+    h1 { font-size: 4.5rem; font-weight: 900; letter-spacing: -0.04em; line-height: 0.85; color: #000; text-transform: uppercase; max-height: 4.2rem; overflow: hidden; }
+    .tagline { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: #999; margin-top: 0.8rem; }
+    nav { padding: 0 3rem; border-bottom: 1px solid #eee; display: flex; gap: 0; }
+    nav a { padding: 0.8rem 1.2rem; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #bbb; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    nav a:hover { color: #000; }
+    nav a.active { color: #000; border-color: #000; }
+    main { max-width: 800px; margin: 0 auto; padding: 2.5rem 3rem 4rem; }
+    h2 { font-size: 2.5rem; font-weight: 900; text-transform: uppercase; letter-spacing: -0.03em; color: #000; margin-bottom: 0.3rem; max-height: 2.4rem; overflow: hidden; }
+    h3 { font-size: 1.1rem; font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; color: #000; margin: 2.5rem 0 0.8rem; }
+    p { font-size: 0.85rem; line-height: 1.7; color: #555; margin-bottom: 1rem; }
+    .lead { font-size: 1rem; color: #333; line-height: 1.6; margin-bottom: 1.5rem; }
+
+    .diagram {
+      background: #fafafa; border: 1px solid #eee; padding: 2rem;
+      font-family: 'SF Mono', Monaco, monospace; font-size: 0.7rem;
+      line-height: 1.8; color: #666; margin: 1.5rem 0; white-space: pre;
+      overflow-x: auto;
+    }
+    .diagram .hl { color: #000; font-weight: 700; }
+
+    .step {
+      display: flex; gap: 1.5rem; margin: 1.5rem 0;
+      padding: 1.2rem 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .step-num {
+      font-size: 2rem; font-weight: 900; color: #eee;
+      min-width: 3rem; text-align: center; line-height: 1;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 0.85rem; font-weight: 700; color: #000; margin-bottom: 0.3rem; }
+    .step-desc { font-size: 0.75rem; color: #888; line-height: 1.5; }
+
+    .spec {
+      background: #fafafa; border: 1px solid #eee; padding: 1.2rem 1.5rem;
+      margin: 1rem 0; font-size: 0.75rem;
+    }
+    .spec .row { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px solid #f5f5f5; }
+    .spec .row:last-child { border: none; }
+    .spec .k { color: #999; }
+    .spec .v { color: #000; font-weight: 600; font-family: 'SF Mono', Monaco, monospace; font-size: 0.7rem; }
+
+    .progress-section { margin-top: 3rem; }
+    .progress-item {
+      display: flex; align-items: baseline; gap: 0.8rem;
+      padding: 0.5rem 0; border-bottom: 1px solid #f5f5f5;
+      font-size: 0.8rem;
+    }
+    .progress-item .status { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; min-width: 4rem; }
+    .progress-item .status.done { color: #000; }
+    .progress-item .status.wip { color: #999; }
+    .progress-item .status.next { color: #ddd; }
+    .progress-item .label { color: #333; }
+    .progress-item .label.dim { color: #bbb; }
+    .progress-item .date { color: #ccc; font-size: 0.65rem; margin-left: auto; font-family: 'SF Mono', Monaco, monospace; }
+
+    .callout {
+      border-left: 3px solid #000; padding: 1rem 1.5rem;
+      margin: 1.5rem 0; background: #fafafa;
+    }
+    .callout p { margin: 0; font-size: 0.8rem; color: #333; }
+    .callout .title { font-weight: 700; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin-bottom: 0.3rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>BITCOINTORRENT</h1>
+    <div class="tagline">Peer-to-peer streaming &mdash; BSV micropayments</div>
+  </header>
+
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="app.html">Stream</a>
+    <a href="tokenize.html" class="active">Tokenize</a>
+    <a href="BitCoinTorrent-Report.html">Report</a>
+    <a href="https://github.com/b0ase/BitCoinTorrent">GitHub</a>
+  </nav>
+
+  <main>
+    <h2>TOKENIZE</h2>
+    <p class="lead">
+      Every piece of content becomes a revenue-generating asset.
+      Mint a token. Stream the content. Revenue flows to token holders automatically.
+    </p>
+
+    <h3>THE MODEL</h3>
+    <div class="diagram"><span class="hl">Creator</span> makes a video
+    ↓
+<span class="hl">Mints BSV-21 token</span> — e.g. 1,000,000 $EMPRESS tokens
+    ↓
+<span class="hl">Links token to content</span> — token address = revenue address
+    ↓
+Creator holds <span class="hl">100% of tokens</span> = receives 100% of streaming revenue
+    ↓
+<span class="hl">Viewers stream</span> → pay 1 sat/piece → sats flow to token address
+    ↓
+Creator <span class="hl">sells/distributes tokens</span> to investors, collaborators, fans
+    ↓
+Revenue is <span class="hl">automatically distributed</span> to all token holders
+    proportional to their holdings</div>
+
+    <h3>HOW IT WORKS</h3>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Add content</div>
+        <div class="step-desc">Drag a video into the BitCoinTorrent client. It's converted to streamable fMP4, chunked into torrent pieces, and a manifest is generated with pricing terms.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Tokenize</div>
+        <div class="step-desc">Click "Tokenize" to mint a BSV-21 fungible token representing ownership of that content's revenue stream. You choose the name, ticker, and supply. The token's address becomes the revenue destination in the content manifest.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Share &amp; seed</div>
+        <div class="step-desc">The content is announced to the BitTorrent swarm. Your node seeds it. Other nodes can choose to cache and re-seed it (earning the seeder's 40% cut). The more popular the content, the more nodes seed it.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Viewers pay per piece</div>
+        <div class="step-desc">Every viewer opens a payment channel. As they watch, each 256KB piece triggers a signed BSV transaction. The creator's 60% share flows to the token address. Only 2 on-chain transactions per viewing session.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Dividends to token holders</div>
+        <div class="step-desc">Revenue accumulates at the token address. BitCoinTorrent nodes batch-distribute dividends to all token holders proportional to their holdings. Batching avoids dust/fee problems — payouts happen when they make economic sense, not per-transaction.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">Trade tokens</div>
+        <div class="step-desc">Tokens are standard BSV-21. They can be transferred, sold, or listed on any BSV marketplace. Buying tokens in a video = buying a share of its future streaming revenue. A hit song's tokens become more valuable as streams increase.</div>
+      </div>
+    </div>
+
+    <h3>ECONOMICS EXAMPLE</h3>
+
+    <div class="spec">
+      <div class="row"><span class="k">Content</span><span class="v">Underground Empress (music video, 16MB)</span></div>
+      <div class="row"><span class="k">Token</span><span class="v">$EMPRESS — 1,000,000 supply (BSV-21)</span></div>
+      <div class="row"><span class="k">Price</span><span class="v">1 sat/piece (63 pieces = 63 sats per stream)</span></div>
+      <div class="row"><span class="k">Creator share</span><span class="v">60% = 37 sats per stream</span></div>
+      <div class="row"><span class="k">Seeder share</span><span class="v">40% = 25 sats per stream (to whoever serves it)</span></div>
+    </div>
+    <div class="spec">
+      <div class="row"><span class="k">1,000 streams</span><span class="v">37,000 sats → token address ($0.0185)</span></div>
+      <div class="row"><span class="k">100,000 streams</span><span class="v">3,700,000 sats → token address ($1.85)</span></div>
+      <div class="row"><span class="k">10,000,000 streams</span><span class="v">370,000,000 sats → token address ($185)</span></div>
+    </div>
+    <div class="spec">
+      <div class="row"><span class="k">Holder with 10% tokens</span><span class="v">Receives 10% of all streaming revenue forever</span></div>
+      <div class="row"><span class="k">Holder with 1 token</span><span class="v">Receives 0.0001% — dividends batched to avoid dust</span></div>
+    </div>
+
+    <h3>THE DIVIDEND BATCHING PROBLEM</h3>
+
+    <p>
+      If a video has 1,000,000 token holders each with 1 token, and the video earns 100 sats, each holder is owed 0.0001 sats. That's below the dust limit — you can't send it. Even if you could, the transaction fee (~200 sats) would exceed the dividend.
+    </p>
+
+    <div class="callout">
+      <div class="title">Solution: Node-batched dividends</div>
+      <p>
+        BitCoinTorrent nodes accumulate revenue at the token address. When the balance is large enough for a meaningful payout, nodes distribute dividends in batches. Small holders receive their accumulated dividends less frequently but in economically viable amounts. The node doing the distribution earns a small fee for the service.
+      </p>
+    </div>
+
+    <p>
+      Nodes stay in sync about token holder balances via <strong>Proof of Indexing</strong> — the same mechanism used by the $402 protocol's HTM token. Each node independently indexes the BSV blockchain for token transfers and computes the current holder distribution. Nodes can verify each other's work by comparing merkle roots of their indexed state.
+    </p>
+
+    <h3>TOKEN SPECIFICATION</h3>
+
+    <div class="spec">
+      <div class="row"><span class="k">Standard</span><span class="v">BSV-21 (fungible token)</span></div>
+      <div class="row"><span class="k">Supply</span><span class="v">Configurable per content (default: 1,000,000)</span></div>
+      <div class="row"><span class="k">Metadata</span><span class="v">Content infohash, title, creator, linked manifest</span></div>
+      <div class="row"><span class="k">Revenue address</span><span class="v">Token's deployment address (immutable)</span></div>
+      <div class="row"><span class="k">Divisibility</span><span class="v">Whole tokens only (no decimals)</span></div>
+      <div class="row"><span class="k">Minting</span><span class="v">One-time at content creation (no further minting)</span></div>
+    </div>
+
+    <h3>PROGRESS</h3>
+
+    <div class="progress-section">
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">Payment channels (nLocktime, 2 on-chain TXs per session)</span>
+        <span class="date">2026-04-07</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">BEP 10 wire protocol (bct_pay extension)</span>
+        <span class="date">2026-04-07</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">Content ingestion (MP4 → fMP4 → torrent + manifest)</span>
+        <span class="date">2026-04-07</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">$402 payment gate (HTTP 402 → magnet URI)</span>
+        <span class="date">2026-04-07</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">Real BSV mainnet payments (6+ settlement TXs on-chain)</span>
+        <span class="date">2026-04-07</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">P2P swarm manager (WebSocket coordination)</span>
+        <span class="date">2026-04-07</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">Electron desktop app (Mac/Win/Linux builds)</span>
+        <span class="date">2026-04-08</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">Settings UI (wallets, content folders, pricing)</span>
+        <span class="date">2026-04-08</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">Hetzner Docker deployment (3 videos seeding live)</span>
+        <span class="date">2026-04-08</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">Web streaming app (Vercel landing page)</span>
+        <span class="date">2026-04-08</span>
+      </div>
+      <div class="progress-item">
+        <span class="status done">DONE</span>
+        <span class="label">GitHub releases (v0.1.1, all platforms)</span>
+        <span class="date">2026-04-08</span>
+      </div>
+      <div class="progress-item">
+        <span class="status wip">BUILD</span>
+        <span class="label">Content tokenization UI (mint BSV-21 per video)</span>
+        <span class="date"></span>
+      </div>
+      <div class="progress-item">
+        <span class="status wip">BUILD</span>
+        <span class="label">Revenue routing to token address</span>
+        <span class="date"></span>
+      </div>
+      <div class="progress-item">
+        <span class="status next">NEXT</span>
+        <span class="label dim">Dividend distribution engine (batched payouts)</span>
+        <span class="date"></span>
+      </div>
+      <div class="progress-item">
+        <span class="status next">NEXT</span>
+        <span class="label dim">Proof of Indexing (node sync for token balances)</span>
+        <span class="date"></span>
+      </div>
+      <div class="progress-item">
+        <span class="status next">NEXT</span>
+        <span class="label dim">Token marketplace / transfer UI</span>
+        <span class="date"></span>
+      </div>
+      <div class="progress-item">
+        <span class="status next">NEXT</span>
+        <span class="label dim">Wallet connect (1Sat / HandCash)</span>
+        <span class="date"></span>
+      </div>
+      <div class="progress-item">
+        <span class="status next">NEXT</span>
+        <span class="label dim">Real P2P piece transfer between viewers</span>
+        <span class="date"></span>
+      </div>
+      <div class="progress-item">
+        <span class="status next">NEXT</span>
+        <span class="label dim">ClawMiner integration (hardware seeder nodes)</span>
+        <span class="date"></span>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
