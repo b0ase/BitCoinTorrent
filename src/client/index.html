@@ -53,7 +53,7 @@
     #wallet-bar .addr { font-family: 'SF Mono', Monaco, monospace; font-size: 0.65rem; color: #bbb; }
     #wallet-bar .bal { font-weight: 600; color: #000; margin-left: auto; }
     #add-videos-btn {
-      display: none; background: #000; color: #fff; border: none;
+      background: #000; color: #fff; border: none;
       padding: 0.4rem 1rem; font-family: inherit; font-size: 0.65rem;
       font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
       cursor: pointer;
@@ -335,8 +335,8 @@
       <span class="mode" id="wallet-mode">Loading</span>
       <span class="addr" id="wallet-addr"></span>
       <span class="bal" id="wallet-bal"></span>
-      <button id="add-videos-btn" onclick="window.bitcointorrent?.addVideos()">+ Add</button>
-      <button id="settings-btn" style="display:none" class="btn-outline" onclick="showSettings()">Settings</button>
+      <button id="add-videos-btn" onclick="addContent()">+ Add</button>
+      <button id="settings-btn" class="btn-outline" onclick="showSettings()">Settings</button>
     </div>
 
     <div id="nav-tabs" class="lib-tabs" style="margin-bottom:1.5rem">
@@ -742,9 +742,31 @@
     setInterval(loadWallet, 30000);
 
     if (window.bitcointorrent?.isElectron) {
-      document.getElementById('add-videos-btn').style.display = '';
-      document.getElementById('settings-btn').style.display = '';
       document.getElementById('tab-library').style.display = '';
+    }
+
+    // ─── Add Content ────────────────────────────────
+    async function addContent() {
+      if (window.bitcointorrent?.addVideos) {
+        // Electron: native file picker
+        await window.bitcointorrent.addVideos();
+        loadCatalog();
+      } else {
+        // Browser: prompt for a file path on the server
+        const path = prompt('Enter video file path on the server:\n(e.g. /videos/my-video.mp4)');
+        if (!path) return;
+        const title = path.split('/').pop().replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+        try {
+          const res = await fetch(`${API}/api/content`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoPath: path, title, creatorAddress: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' }),
+          });
+          const data = await res.json();
+          if (data.error) alert(data.error);
+          else { alert(`Added: ${title} (${data.totalPieces} pieces)`); loadCatalog(); }
+        } catch (err) { alert('Error: ' + err.message); }
+      }
     }
 
     // ─── Tab Navigation ─────────────────────────────────
