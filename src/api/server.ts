@@ -21,6 +21,9 @@ import { PaymentChannel } from '../payment/channel.js';
 import { Wallet } from '../payment/wallet.js';
 import { validateSettlementTx } from '../payment/settlement.js';
 import { createPaymentGate } from './middleware/payment-gate.js';
+import { mintContentToken } from '../token/mint.js';
+import { fetchHolderSnapshot, snapshotToRecipients, createSingleHolderSnapshot } from '../token/indexer.js';
+import type { ContentToken } from '../token/types.js';
 import { estimateTotalCost } from '../ingest/manifest.js';
 import type { ContentManifest, CatalogEntry } from '../types/torrent.js';
 import type { ChannelConfig } from '../types/payment.js';
@@ -524,6 +527,74 @@ export async function createServer(opts: ServerOptions) {
   app.get('/api/swarm/peers', async () => {
     return swarmManager.getStatus().peers;
   });
+
+  // ─── Token API ──────────────────────────────────────────
+
+  // Server-side token storage
+  const tokens = new Map<string, ContentToken>();
+
+  /** POST /api/tokenize — Mint a BSV-21 token for content */
+  app.post<{
+    Body: { infohash: string; ticker: string; name: string; supply: number };
+  }>('/api/tokenize', async (request) => {
+    const { infohash, ticker, name: tokenName, supply } = request.body;
+    const manifest = manifests.get(infohash);
+    if (!manifest) throw { statusCode: 404, message: 'Content not found' };
+
+    try {
+      const token = await mintContentToken({
+        ticker,
+        name: tokenName,
+        supply,
+        manifest,
+        wallet: seeder.wallet,
+        live: isLive,
+      });
+
+      tokens.set(infohash, token);
+
+      // Update manifest revenue address to token address
+      const updated = { ...manifest, creator: { ...manifest.creator, address: token.revenueAddress } };
+      manifests.set(infohash, updated);
+
+      return { token };
+    } catch (err: any) {
+      throw { statusCode: 500, message: err.message };
+    }
+  });
+
+  /** GET /api/tokens — List all tokens */
+  app.get('/api/tokens', async () => {
+    return Object.fromEntries(tokens);
+  });
+
+  /** GET /api/token/:infohash — Get token for content */
+  app.get<{ Params: { infohash: string } }>(
+    '/api/token/:infohash',
+    async (request, reply) => {
+      const token = tokens.get(request.params.infohash);
+      if (!token) return reply.status(404).send({ error: 'Not tokenized' });
+      return token;
+    },
+  );
+
+  /** GET /api/token/:infohash/holders — Get token holder snapshot */
+  app.get<{ Params: { infohash: string } }>(
+    '/api/token/:infohash/holders',
+    async (request, reply) => {
+      const token = tokens.get(request.params.infohash);
+      if (!token) return reply.status(404).send({ error: 'Not tokenized' });
+
+      try {
+        // Try live indexer first
+        const snapshot = await fetchHolderSnapshot(token.tokenId);
+        return snapshot;
+      } catch {
+        // Fallback: single holder (creator)
+        return createSingleHolderSnapshot(token);
+      }
+    },
+  );
 
   /** GET /api/wallet — Leecher wallet info + balance */
   app.get('/api/wallet', async () => {

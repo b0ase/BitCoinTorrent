@@ -499,11 +499,16 @@
       const el = document.getElementById('catalog');
       if (!items.length) { el.innerHTML = '<div class="empty"><h2>No content</h2><p>Seed a video to get started.</p></div>'; return; }
 
-      // Fetch tokens if in Electron
+      // Fetch tokens (Electron IPC or server API)
       let tokens = {};
-      if (window.bitcointorrent?.getTokens) {
-        tokens = await window.bitcointorrent.getTokens() || {};
-      }
+      try {
+        if (window.bitcointorrent?.getTokens) {
+          tokens = await window.bitcointorrent.getTokens() || {};
+        } else {
+          const tokRes = await fetch(`${API}/api/tokens`);
+          tokens = await tokRes.json();
+        }
+      } catch {}
 
       el.innerHTML = '';
       for (const it of items) {
@@ -513,7 +518,7 @@
 
         const tokenBadge = token
           ? `<span class="token-badge minted">$${token.ticker}</span>`
-          : (window.bitcointorrent ? `<span class="token-badge" style="background:#ddd;color:#999;cursor:pointer" onclick="event.stopPropagation();openTokenizeModal('${it.infohash}','${it.title.replace(/'/g,"\\'")}')">Tokenize</span>` : '');
+          : `<span class="token-badge" style="background:#ddd;color:#999;cursor:pointer" onclick="event.stopPropagation();openTokenizeModal('${it.infohash}','${it.title.replace(/'/g,"\\'")}')">Tokenize</span>`;
 
         d.innerHTML = `
           <div>
@@ -962,7 +967,7 @@
     }
 
     async function doTokenize() {
-      if (!window.bitcointorrent?.tokenize || !tokenizeInfohash) return;
+      if (!tokenizeInfohash) return;
 
       const ticker = document.getElementById('tok-ticker').value.trim().toUpperCase();
       const name = document.getElementById('tok-name').value.trim();
@@ -975,12 +980,23 @@
       resultEl.style.color = '#999';
       resultEl.textContent = 'Minting token...';
 
-      const result = await window.bitcointorrent.tokenize({
-        infohash: tokenizeInfohash,
-        ticker,
-        name,
-        supply,
-      });
+      let result;
+      if (window.bitcointorrent?.tokenize) {
+        // Electron IPC
+        result = await window.bitcointorrent.tokenize({ infohash: tokenizeInfohash, ticker, name, supply });
+      } else {
+        // Server API
+        try {
+          const res = await fetch(`${API}/api/tokenize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ infohash: tokenizeInfohash, ticker, name, supply }),
+          });
+          result = await res.json();
+        } catch (err) {
+          result = { error: err.message };
+        }
+      }
 
       if (result.error) {
         resultEl.style.color = '#c00';
