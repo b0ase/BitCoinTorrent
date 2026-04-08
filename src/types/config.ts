@@ -38,7 +38,7 @@ export const DEFAULT_TRACKERS = [
 /** Default configuration values */
 export const DEFAULTS = {
   satsPerPiece: 1,
-  creatorSplitBps: 6000,
+  creatorSplitBps: 10_000, // 100% to token holders (no split)
   pieceLength: 262144, // 256KB
   lookahead: 10,
   maxChannelDeposit: 100_000, // 100k sats (~$0.05)

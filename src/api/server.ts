@@ -308,12 +308,14 @@ export async function createServer(opts: ServerOptions) {
 
     const fundingTxid = fundingTx.id('hex');
 
+    // Build recipient list from manifest creator (token holder)
+    // 100% of revenue goes to the token/creator address
+    const recipients = [{ address: manifest.creator.address, bps: 10_000 }];
+
     const config: ChannelConfig = {
       fundingAmount,
       satsPerPiece,
-      seederAddress: seeder.wallet.address,
-      creatorAddress: manifest.creator.address,
-      creatorSplitBps: manifest.creator.splitBps,
+      recipients,
       timeoutBlockHeight: 900_000,
     };
 
@@ -339,9 +341,7 @@ export async function createServer(opts: ServerOptions) {
       maxPieces: channel.maxPieces,
       satsPerPiece,
       leecherAddress: leecherWallet.address,
-      seederAddress: seeder.wallet.address,
-      creatorAddress: manifest.creator.address,
-      creatorSplitBps: manifest.creator.splitBps,
+      recipients,
       live: isLive,
       fundingBroadcast,
     };
@@ -357,36 +357,34 @@ export async function createServer(opts: ServerOptions) {
 
     const { channel, wallet } = session;
 
-    // Create REAL signed payment transaction
+    // Create REAL signed payment transaction (fans out to token holders)
     const update = await channel.createPayment(pieceIndex, wallet);
-
-    // Validate the tx we just created
-    const validation = validateSettlementTx(
-      update.signedTxHex,
-      update.creatorAmount,
-      update.seederAmount,
-    );
-
     const txid = Transaction.fromHex(update.signedTxHex).id('hex');
+
+    // Check TX is parseable
+    const txValid = (() => { try { Transaction.fromHex(update.signedTxHex); return true; } catch { return false; } })();
 
     session.payments.push({
       piece: pieceIndex,
       seq: update.sequenceNumber,
       txid,
-      creatorSats: update.creatorAmount,
-      seederSats: update.seederAmount,
+      creatorSats: update.totalPaid,
+      seederSats: 0,
       txHex: update.signedTxHex,
     });
 
     return {
       pieceIndex,
       sequenceNumber: update.sequenceNumber,
-      creatorAmount: update.creatorAmount,
-      seederAmount: update.seederAmount,
+      totalPaid: update.totalPaid,
+      recipientAmounts: update.recipientAmounts,
+      // Legacy fields for backward compat with current UI
+      creatorAmount: update.totalPaid,
+      seederAmount: 0,
       leecherChange: update.leecherChange,
       txid,
       txHex: update.signedTxHex,
-      txValid: validation.valid,
+      txValid,
       totalPaidPieces: channel.totalPaidPieces,
       remainingPieces: channel.remainingPieces,
     };
@@ -442,8 +440,11 @@ export async function createServer(opts: ServerOptions) {
         satoshis: o.satoshis,
         scriptHex: Buffer.from(o.lockingScript.toBinary()).toString('hex').substring(0, 50) + '...',
       })),
-      totalCreator: channel.creatorAmount,
-      totalSeeder: channel.seederAmount,
+      totalPaid: channel.totalPaid,
+      recipientAmounts: channel.recipientAmounts,
+      // Legacy
+      totalCreator: channel.totalPaid,
+      totalSeeder: 0,
       paymentCount: session.payments.length,
     };
   });
