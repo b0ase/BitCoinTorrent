@@ -20,6 +20,10 @@ export { Seeder } from './seeder/seeder.js';
 export { Economics } from './seeder/economics.js';
 export { createServeProof, verifyServeProof, hashContent, ProofStore } from './seeder/proof-of-serve.js';
 
+// Token
+export { mintContentToken } from './token/mint.js';
+export type { ContentToken, TokenHolder, TokenRevenue, TokenDashboard } from './token/types.js';
+
 // Swarm
 export { SwarmManager } from './swarm/swarm-manager.js';
 

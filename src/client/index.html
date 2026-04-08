@@ -259,6 +259,60 @@
       font-size: 0.65rem; color: #bbb; margin-bottom: 1rem;
     }
 
+    /* ─── Token badge ─── */
+    .token-badge {
+      display: inline-block; font-size: 0.55rem; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 0.15rem 0.5rem; background: #000; color: #fff;
+      margin-left: 0.5rem; vertical-align: middle;
+    }
+    .token-badge.minted { background: #000; }
+
+    /* ─── Tokenize Modal ─── */
+    #tokenize-modal {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.3); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #tokenize-modal.on { display: flex; }
+    #tokenize-modal .modal {
+      background: #fff; border: 2px solid #000; padding: 2.5rem;
+      max-width: 480px; width: 90%;
+    }
+    #tokenize-modal h3 {
+      font-size: 1.5rem; font-weight: 900; text-transform: uppercase;
+      letter-spacing: -0.02em; margin-bottom: 1.2rem;
+    }
+    #tokenize-modal label {
+      display: block; font-size: 0.6rem; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase; color: #999;
+      margin-bottom: 0.3rem; margin-top: 1rem;
+    }
+    #tokenize-modal input {
+      width: 100%; padding: 0.5rem 0.7rem; border: 1px solid #ddd;
+      font-family: inherit; font-size: 0.8rem;
+    }
+    #tokenize-modal input:focus { border-color: #000; outline: none; }
+    #tokenize-modal .actions { display: flex; gap: 0.5rem; margin-top: 1.5rem; }
+
+    /* ─── Token Info Panel ─── */
+    .token-info {
+      border: 1px solid #eee; padding: 1rem 1.5rem; margin-bottom: 1rem;
+    }
+    .token-info .token-header {
+      font-size: 1.2rem; font-weight: 900; text-transform: uppercase;
+      letter-spacing: -0.02em;
+    }
+    .token-info .row {
+      display: flex; justify-content: space-between; padding: 0.2rem 0;
+      font-size: 0.7rem;
+    }
+    .token-info .row .k { color: #bbb; }
+    .token-info .row .v {
+      color: #000; font-weight: 600; font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.65rem;
+    }
+
     /* ─── Empty state ─── */
     .empty {
       padding: 5rem 0; text-align: center;
@@ -398,6 +452,25 @@
     </div>
   </main>
 
+  <div id="tokenize-modal">
+    <div class="modal">
+      <h3>Tokenize Content</h3>
+      <div id="tok-content-name" style="font-size:0.8rem;color:#666;margin-bottom:0.5rem;"></div>
+      <label>Token Ticker</label>
+      <input id="tok-ticker" placeholder="e.g. EMPRESS" maxlength="20" />
+      <label>Token Name</label>
+      <input id="tok-name" placeholder="e.g. Underground Empress" />
+      <label>Total Supply</label>
+      <input id="tok-supply" type="number" value="1000000" min="1" />
+      <div style="font-size:0.6rem;color:#bbb;margin-top:0.3rem;">You will hold 100% of tokens and receive 100% of streaming revenue.</div>
+      <div class="actions">
+        <button class="btn" onclick="doTokenize()">Mint Token</button>
+        <button class="btn-outline" onclick="closeTokenizeModal()">Cancel</button>
+      </div>
+      <div id="tok-result" style="margin-top:1rem;font-size:0.75rem;display:none;"></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
   <script>
     const API = '';
@@ -418,13 +491,48 @@
       const items = await res.json();
       const el = document.getElementById('catalog');
       if (!items.length) { el.innerHTML = '<div class="empty"><h2>No content</h2><p>Seed a video to get started.</p></div>'; return; }
+
+      // Fetch tokens if in Electron
+      let tokens = {};
+      if (window.bitcointorrent?.getTokens) {
+        tokens = await window.bitcointorrent.getTokens() || {};
+      }
+
       el.innerHTML = '';
       for (const it of items) {
+        const token = tokens[it.infohash];
         const d = document.createElement('div');
         d.className = 'cat-item';
-        d.innerHTML = `<div><div class="t">${it.title}</div><div class="m">${Math.round(it.duration)}s / ${it.manifest.totalPieces} pcs / ${(it.manifest.totalBytes/1024/1024).toFixed(1)}MB</div></div><div class="p">${it.totalCost} sats</div>`;
+
+        const tokenBadge = token
+          ? `<span class="token-badge minted">$${token.ticker}</span>`
+          : (window.bitcointorrent ? `<span class="token-badge" style="background:#ddd;color:#999;cursor:pointer" onclick="event.stopPropagation();openTokenizeModal('${it.infohash}','${it.title.replace(/'/g,"\\'")}')">Tokenize</span>` : '');
+
+        d.innerHTML = `
+          <div>
+            <div class="t">${it.title}${tokenBadge}</div>
+            <div class="m">${Math.round(it.duration)}s / ${it.manifest.totalPieces} pcs / ${(it.manifest.totalBytes/1024/1024).toFixed(1)}MB${token ? ' / $' + token.ticker + ' (' + token.supply.toLocaleString() + ' tokens)' : ''}</div>
+          </div>
+          <div class="p">${it.totalCost} sats</div>
+        `;
         d.onclick = () => startStream(it);
         el.appendChild(d);
+
+        // Show token info panel below if tokenized
+        if (token) {
+          const info = document.createElement('div');
+          info.className = 'token-info';
+          info.innerHTML = `
+            <div class="token-header">$${token.ticker}</div>
+            <div class="row"><span class="k">Token ID</span><span class="v">${token.tokenId.substring(0, 24)}...</span></div>
+            <div class="row"><span class="k">Supply</span><span class="v">${token.supply.toLocaleString()}</span></div>
+            <div class="row"><span class="k">Revenue Address</span><span class="v">${token.revenueAddress}</span></div>
+            <div class="row"><span class="k">Deploy TX</span><span class="v">${token.deployTxid.substring(0, 24)}...</span></div>
+            <div class="row"><span class="k">Holder</span><span class="v">${token.creatorAddress} (100%)</span></div>
+            <div class="row"><span class="k">Status</span><span class="v">${token.live ? 'ON-CHAIN' : 'SIMULATED'}</span></div>
+          `;
+          el.appendChild(info);
+        }
       }
     }
 
@@ -782,6 +890,61 @@
         document.getElementById('set-import-wif').value = '';
         loadWallet();
         alert(`${which} wallet updated.`);
+      }
+    }
+
+    // ─── Tokenization ────────────────────────────────
+    let tokenizeInfohash = null;
+
+    function openTokenizeModal(infohash, title) {
+      tokenizeInfohash = infohash;
+      document.getElementById('tok-content-name').textContent = title;
+      document.getElementById('tok-ticker').value = title.split(' ')[0].toUpperCase().substring(0, 10);
+      document.getElementById('tok-name').value = title;
+      document.getElementById('tok-supply').value = '1000000';
+      document.getElementById('tok-result').style.display = 'none';
+      document.getElementById('tokenize-modal').classList.add('on');
+    }
+
+    function closeTokenizeModal() {
+      document.getElementById('tokenize-modal').classList.remove('on');
+      tokenizeInfohash = null;
+    }
+
+    async function doTokenize() {
+      if (!window.bitcointorrent?.tokenize || !tokenizeInfohash) return;
+
+      const ticker = document.getElementById('tok-ticker').value.trim().toUpperCase();
+      const name = document.getElementById('tok-name').value.trim();
+      const supply = parseInt(document.getElementById('tok-supply').value);
+
+      if (!ticker || !name || !supply) { alert('Fill all fields'); return; }
+
+      const resultEl = document.getElementById('tok-result');
+      resultEl.style.display = 'block';
+      resultEl.style.color = '#999';
+      resultEl.textContent = 'Minting token...';
+
+      const result = await window.bitcointorrent.tokenize({
+        infohash: tokenizeInfohash,
+        ticker,
+        name,
+        supply,
+      });
+
+      if (result.error) {
+        resultEl.style.color = '#c00';
+        resultEl.textContent = `Error: ${result.error}`;
+      } else {
+        resultEl.style.color = '#000';
+        resultEl.innerHTML = `
+          <strong>$${result.token.ticker}</strong> minted!<br>
+          Token ID: ${result.token.tokenId.substring(0, 24)}...<br>
+          Revenue Address: ${result.token.revenueAddress}<br>
+          Status: ${result.token.live ? 'ON-CHAIN' : 'SIMULATED'}
+        `;
+        // Refresh catalog to show the token badge
+        setTimeout(() => { closeTokenizeModal(); loadCatalog(); }, 2000);
       }
     }
 

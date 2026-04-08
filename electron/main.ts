@@ -12,6 +12,8 @@ import { readdir, mkdir, readFile, writeFile, access, stat } from 'node:fs/promi
 import { createServer, type ServerOptions } from '../src/api/server.js';
 import { ingest } from '../src/ingest/index.js';
 import { Wallet } from '../src/payment/wallet.js';
+import { mintContentToken } from '../src/token/mint.js';
+import type { ContentToken } from '../src/token/types.js';
 import { DEFAULTS } from '../src/types/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -25,9 +27,10 @@ const PORT = 8404;
 interface AppConfig {
   seederWif: string;
   leecherWif: string;
-  /** Folders to scan for content */
   contentFolders: string[];
   pricePerPiece: number;
+  /** Minted content tokens: infohash → token */
+  tokens?: Record<string, ContentToken>;
 }
 
 async function loadConfig(): Promise<AppConfig | null> {
@@ -257,6 +260,56 @@ function setupIPC() {
     }
 
     return files.sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  // Tokenize content: mint a BSV-21 token linked to a video
+  ipcMain.handle('tokenize', async (_event, opts: {
+    infohash: string;
+    ticker: string;
+    name: string;
+    supply: number;
+  }) => {
+    if (!config || !server) return { error: 'Not ready' };
+
+    const manifest = server.manifests.get(opts.infohash);
+    if (!manifest) return { error: 'Content not found' };
+
+    const wallet = new Wallet(config.seederWif);
+    const live = !!config.leecherWif;
+
+    try {
+      const token = await mintContentToken({
+        ticker: opts.ticker,
+        name: opts.name,
+        supply: opts.supply,
+        manifest,
+        wallet,
+        live,
+      });
+
+      // Store token in config
+      if (!config.tokens) config.tokens = {};
+      config.tokens[opts.infohash] = token;
+      await saveConfig(config);
+
+      // Update the manifest's creator address to the token's revenue address
+      const updated = { ...manifest, creator: { ...manifest.creator, address: token.revenueAddress } };
+      server.manifests.set(opts.infohash, updated);
+
+      return { token };
+    } catch (err: any) {
+      return { error: err.message };
+    }
+  });
+
+  // Get token for a piece of content
+  ipcMain.handle('get-token', (_event, infohash: string) => {
+    return config?.tokens?.[infohash] ?? null;
+  });
+
+  // Get all tokens
+  ipcMain.handle('get-tokens', () => {
+    return config?.tokens ?? {};
   });
 
   // Regenerate wallet keypair
