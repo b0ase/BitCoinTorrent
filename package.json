@@ -46,6 +46,7 @@
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.1.0",
     "@fastify/websocket": "^11.2.0",
+    "@supabase/supabase-js": "^2.103.0",
     "bencode": "^4.0.0",
     "create-torrent": "^6.1.0",
     "dotenv": "^17.4.1",

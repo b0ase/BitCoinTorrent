@@ -41,6 +41,7 @@ import { StreamingLoop } from '../src/agents/streaming-loop.js';
 import type { TokenHolderShare } from '../src/agents/piece-payment.js';
 import { UtxoPool } from '../src/agents/utxo-pool.js';
 import { ArcBroadcaster, type TxBroadcaster } from '../src/payment/broadcaster.js';
+import { registryFromEnv, type SupabaseRegistry } from '../src/agents/registry-supabase.js';
 
 function parseFlags(argv: string[]): Record<string, string | boolean> {
   const out: Record<string, string | boolean> = {};
@@ -112,6 +113,20 @@ async function main() {
     console.log('Piece broadcaster: WhatsOnChain (default; pass --arc for GorillaPool)');
   }
 
+  // Registry selection: prefer Supabase when SUPABASE_URL +
+  // SUPABASE_SERVICE_ROLE_KEY are set in the env. Falls back to
+  // the in-memory MemoryRegistry that buildSwarm creates by default
+  // when the env is missing.
+  let persistentRegistry: SupabaseRegistry | null = null;
+  const supaRegistry = registryFromEnv();
+  if (supaRegistry) {
+    persistentRegistry = supaRegistry;
+    await persistentRegistry.start();
+    console.log('Registry: Supabase (persistent)');
+  } else {
+    console.log('Registry: in-memory (set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to persist)');
+  }
+
   const config = await loadAgentConfig();
   if (!config) {
     console.error(
@@ -133,6 +148,7 @@ async function main() {
 
   // Build the swarm (live on-chain hooks for producer/financier).
   const swarm: Swarm = buildSwarm(config.agents, {
+    registry: persistentRegistry ?? undefined,
     tickIntervalMs: 15_000,
     producerBudgetSats: 5_000,
     producerMaxOpenOffers: maxOpenOffers,
@@ -261,6 +277,7 @@ async function main() {
     clearInterval(reaper);
     for (const loop of activeLoops.values()) loop.stop();
     swarm.stop();
+    persistentRegistry?.stop();
     try {
       await app.close();
     } catch {}
