@@ -29,20 +29,22 @@ describe('UtxoPool (pure logic, no prime)', () => {
     expect(pool.allocate()).toBeNull();
   });
 
-  it('allocate cycles through slots round-robin', () => {
+  it('allocate cycles through slots round-robin, with release between allocations', () => {
     const src = makeCachedSourceTx(wallet);
     // Manually stuff 3 slots so we can test allocate without a real prime
     // @ts-expect-error accessing private for test injection
     pool['slots'] = [
-      { sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1 },
-      { sourceTx: src, vout: 1, satoshis: 100, chainDepth: 1 },
-      { sourceTx: src, vout: 2, satoshis: 100, chainDepth: 1 },
+      { sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1, reserved: false },
+      { sourceTx: src, vout: 1, satoshis: 100, chainDepth: 1, reserved: false },
+      { sourceTx: src, vout: 2, satoshis: 100, chainDepth: 1, reserved: false },
     ];
     const voutsAllocated: number[] = [];
     for (let i = 0; i < 9; i++) {
       const slot = pool.allocate();
       expect(slot).not.toBeNull();
       voutsAllocated.push(slot!.vout);
+      // Release so the next iteration can re-pick this slot
+      pool.release(slot!);
     }
     // Each slot should have been allocated exactly 3 times
     expect(voutsAllocated.filter((v) => v === 0)).toHaveLength(3);
@@ -52,15 +54,36 @@ describe('UtxoPool (pure logic, no prime)', () => {
     expect(voutsAllocated.slice(0, 3).sort()).toEqual([0, 1, 2]);
   });
 
+  it('allocate refuses to hand out the same slot while reserved', () => {
+    const src = makeCachedSourceTx(wallet);
+    // @ts-expect-error private
+    pool['slots'] = [
+      { sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1, reserved: false },
+      { sourceTx: src, vout: 1, satoshis: 100, chainDepth: 1, reserved: false },
+    ];
+    const a = pool.allocate();
+    const b = pool.allocate();
+    const c = pool.allocate();
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(c).toBeNull(); // both slots reserved, nothing to hand out
+    pool.release(a!);
+    const d = pool.allocate();
+    expect(d).not.toBeNull();
+  });
+
   it('record() increments chain depth and freezes when it hits the limit', () => {
     const src = makeCachedSourceTx(wallet);
     // @ts-expect-error private
-    pool['slots'] = [{ sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1 }];
+    pool['slots'] = [{ sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1, reserved: false }];
     const slot = pool.allocate()!;
 
     // Depth 1 -> 2 -> 3 -> 4 -> frozen at depth 5
-    for (let i = 0; i < 4; i++) {
-      pool.record(slot, src, 0, 99);
+    // record() clears reserved each time, so re-allocate between records
+    pool.record(slot, src, 0, 99);
+    for (let i = 0; i < 3; i++) {
+      const s = pool.allocate()!;
+      pool.record(s, src, 0, 99);
     }
     expect(slot.frozenUntil).toBeDefined();
     expect(slot.chainDepth).toBe(0); // optimistic reset
@@ -79,6 +102,7 @@ describe('UtxoPool (pure logic, no prime)', () => {
         vout: 0,
         satoshis: 100,
         chainDepth: 0,
+        reserved: false,
         frozenUntil: Date.now() + 100_000,
       },
     ];
@@ -94,16 +118,17 @@ describe('UtxoPool (pure logic, no prime)', () => {
     const now = Date.now();
     // @ts-expect-error private
     pool['slots'] = [
-      { sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1 },
-      { sourceTx: src, vout: 1, satoshis: 100, chainDepth: 5 }, // maxed
+      { sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1, reserved: false },
+      { sourceTx: src, vout: 1, satoshis: 100, chainDepth: 5, reserved: false }, // maxed
       {
         sourceTx: src,
         vout: 2,
         satoshis: 100,
         chainDepth: 0,
+        reserved: false,
         frozenUntil: now + 100_000,
       }, // frozen
-      { sourceTx: src, vout: 3, satoshis: 100, chainDepth: 2 },
+      { sourceTx: src, vout: 3, satoshis: 100, chainDepth: 2, reserved: false },
     ];
     expect(pool.size).toBe(4);
     expect(pool.availableCount).toBe(2);
@@ -112,7 +137,7 @@ describe('UtxoPool (pure logic, no prime)', () => {
   it('getStats reports allocation, recording, freeze, and starve counts', () => {
     const src = makeCachedSourceTx(wallet);
     // @ts-expect-error private
-    pool['slots'] = [{ sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1 }];
+    pool['slots'] = [{ sourceTx: src, vout: 0, satoshis: 100, chainDepth: 1, reserved: false }];
     const slot = pool.allocate()!;
     pool.record(slot, src, 0, 99);
     pool.allocate();

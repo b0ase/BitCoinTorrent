@@ -23,6 +23,8 @@
  *   --slots N            pool slot count primed before streaming (default 100)
  *   --sats-per-slot N    sats allocated to each pool slot (default 500)
  *   --prime-txid HEX     prefer this txid's utxo when priming the pool
+ *   --inflight N         concurrent broadcasts per loop (default 3)
+ *   --max-offers N       max simultaneous open offers per producer (default 5)
  */
 
 import Fastify from 'fastify';
@@ -66,6 +68,8 @@ async function main() {
     typeof flags['prime-txid'] === 'string'
       ? (flags['prime-txid'] as string)
       : undefined;
+  const maxInflight = Number(flags.inflight ?? 3);
+  const maxOpenOffers = Number(flags['max-offers'] ?? 5);
 
   const config = await loadAgentConfig();
   if (!config) {
@@ -90,7 +94,7 @@ async function main() {
   const swarm: Swarm = buildSwarm(config.agents, {
     tickIntervalMs: 15_000,
     producerBudgetSats: 5_000,
-    producerMaxOpenOffers: 1,
+    producerMaxOpenOffers: maxOpenOffers,
     productionIdeas: [
       'Star Wars Episode 1000',
       'The Last Piece',
@@ -171,6 +175,7 @@ async function main() {
       holders,
       satsPerPiece,
       piecesPerSecond,
+      maxInflight,
       pool,
       onPiece: (receipt) => {
         pieceTxCount++;

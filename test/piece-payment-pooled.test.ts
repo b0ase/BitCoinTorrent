@@ -42,6 +42,7 @@ async function primeLocal(
     vout: i,
     satoshis: satsPerSlot,
     chainDepth: 1,
+    reserved: false,
   }));
 }
 

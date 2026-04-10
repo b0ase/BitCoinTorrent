@@ -40,6 +40,13 @@ export interface UtxoSlot {
   /** Unconfirmed ancestor depth from the currently spendable UTXO */
   chainDepth: number;
   /**
+   * True while a broadcast against this slot is in flight. Set by
+   * allocate(), cleared by record() or release(). Prevents a
+   * second concurrent allocate() from handing out the same slot
+   * to a different worker (which would produce a double-spend).
+   */
+  reserved: boolean;
+  /**
    * If set, the slot is frozen until this timestamp. Used after
    * chainDepth hits the limit to wait for a block confirmation
    * that clears the ancestor chain.
@@ -71,6 +78,7 @@ export class UtxoPool {
     recordings: 0,
     freezes: 0,
     starves: 0,
+    releases: 0,
   };
 
   constructor(opts: UtxoPoolOptions = {}) {
@@ -86,6 +94,7 @@ export class UtxoPool {
     const now = Date.now();
     return this.slots.filter(
       (s) =>
+        !s.reserved &&
         s.chainDepth < this.maxChainDepth &&
         (!s.frozenUntil || s.frozenUntil <= now),
     ).length;
@@ -173,6 +182,7 @@ export class UtxoPool {
         vout: i,
         satoshis: satsPerSlot,
         chainDepth: 1, // split tx itself is unconfirmed
+        reserved: false,
       });
     }
 
@@ -180,8 +190,10 @@ export class UtxoPool {
   }
 
   /**
-   * Return the next allocatable slot (round-robin). Skips slots at
-   * max chain depth and slots still inside their frozen window.
+   * Return the next allocatable slot (round-robin). Skips slots
+   * that are reserved, at max chain depth, or inside their frozen
+   * window. The returned slot is marked reserved and will not be
+   * handed out again until record() or release() is called on it.
    * Returns null if every slot is currently unusable — caller
    * should back off and retry.
    */
@@ -190,14 +202,26 @@ export class UtxoPool {
     for (let i = 0; i < this.slots.length; i++) {
       const idx = (this.cursor + i) % this.slots.length;
       const s = this.slots[idx];
+      if (s.reserved) continue;
       if (s.chainDepth >= this.maxChainDepth) continue;
       if (s.frozenUntil && s.frozenUntil > now) continue;
+      s.reserved = true;
       this.cursor = (idx + 1) % this.slots.length;
       this.stats.allocations++;
       return s;
     }
     this.stats.starves++;
     return null;
+  }
+
+  /**
+   * Return a reserved slot to the pool without advancing its chain
+   * depth. Used when a broadcast fails and we want to retry the
+   * same slot later without burning a depth increment.
+   */
+  release(slot: UtxoSlot): void {
+    slot.reserved = false;
+    this.stats.releases++;
   }
 
   /**
@@ -216,6 +240,7 @@ export class UtxoPool {
     slot.vout = newVout;
     slot.satoshis = newSatoshis;
     slot.chainDepth += 1;
+    slot.reserved = false;
     this.stats.recordings++;
     if (slot.chainDepth >= this.maxChainDepth) {
       slot.frozenUntil = Date.now() + this.cooldownMs;

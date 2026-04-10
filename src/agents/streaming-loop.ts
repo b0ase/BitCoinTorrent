@@ -31,6 +31,14 @@ export interface StreamingLoopOptions {
   /** Desired target pieces-per-second; realised rate may be lower. */
   piecesPerSecond: number;
   /**
+   * Maximum concurrent in-flight broadcasts per loop. When network
+   * latency dominates (every broadcast is 200-500ms against WoC),
+   * allowing concurrency is the only way a single loop can exceed
+   * 2 TX/s. Defaults to 1 for backwards compatibility; raise it to
+   * 3-5 for the live swarm.
+   */
+  maxInflight?: number;
+  /**
    * Optional callback fired after every successful broadcast.
    * Used by the swarm coordinator to update counters and the UI.
    */
@@ -62,8 +70,9 @@ export interface StreamingLoopOptions {
 
 export class StreamingLoop {
   private readonly opts: StreamingLoopOptions;
+  private readonly maxInflight: number;
   private handle: ReturnType<typeof setInterval> | null = null;
-  private busy = false;
+  private inflight = 0;
   private piecesBroadcast = 0;
   private errors = 0;
   private startedAt = 0;
@@ -77,6 +86,10 @@ export class StreamingLoop {
     }
     if (opts.holders.length === 0) {
       throw new Error('holders must be non-empty');
+    }
+    this.maxInflight = opts.maxInflight ?? 1;
+    if (this.maxInflight < 1) {
+      throw new Error('maxInflight must be >= 1');
     }
     this.opts = opts;
   }
@@ -107,8 +120,8 @@ export class StreamingLoop {
     const intervalMs = Math.max(1, Math.floor(1000 / this.opts.piecesPerSecond));
     this.startedAt = Date.now();
     this.handle = setInterval(() => {
-      if (this.busy) return;
-      this.busy = true;
+      if (this.inflight >= this.maxInflight) return;
+      this.inflight++;
       this.fireOnce()
         .catch((err: unknown) => {
           this.errors++;
@@ -116,7 +129,7 @@ export class StreamingLoop {
           this.opts.onError?.(e, this.errors);
         })
         .finally(() => {
-          this.busy = false;
+          this.inflight--;
         });
     }, intervalMs);
   }

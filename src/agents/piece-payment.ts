@@ -152,16 +152,24 @@ export async function broadcastPiecePaymentPooled(opts: {
     throw new Error('UtxoPool exhausted — every slot is frozen or at max chain depth');
   }
 
-  const tx = await buildPiecePaymentTx({
-    viewer,
-    holders,
-    satsPerPiece,
-    sourceTx: slot.sourceTx,
-    sourceVout: slot.vout,
-  });
+  let tx: Transaction;
+  try {
+    tx = await buildPiecePaymentTx({
+      viewer,
+      holders,
+      satsPerPiece,
+      sourceTx: slot.sourceTx,
+      sourceVout: slot.vout,
+    });
+  } catch (err) {
+    // Build failure — return the slot unchanged so the caller can retry
+    pool.release(slot);
+    throw err;
+  }
 
   const result = await viewer.broadcast(tx);
   if (!result.success) {
+    pool.release(slot);
     throw new Error(`Piece broadcast failed: ${result.error}`);
   }
 
