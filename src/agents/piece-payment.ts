@@ -25,6 +25,7 @@
 
 import { Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
 import { Wallet } from '../payment/wallet.js';
+import type { UtxoPool, UtxoSlot } from './utxo-pool.js';
 
 export interface TokenHolderShare {
   address: string;
@@ -123,8 +124,66 @@ export async function buildPiecePaymentTx(
 }
 
 /**
+ * Broadcast a piece payment using a UtxoPool slot. The hot-path
+ * entry point for the streaming loop. Does NOT call fetchUtxos or
+ * fetchTransaction — the slot's cached sourceTx is used directly.
+ * After a successful broadcast, the change output is fed back into
+ * the pool so the slot can be reused.
+ *
+ * Throws if:
+ *   - the pool is exhausted (all slots frozen or at max depth);
+ *     caller should back off and retry.
+ *   - the slot's cached satoshis are insufficient for the fan-out
+ *     plus fees; caller should top up the slot or skip it.
+ *   - the broadcast fails.
+ */
+export async function broadcastPiecePaymentPooled(opts: {
+  viewer: Wallet;
+  holders: TokenHolderShare[];
+  satsPerPiece: number;
+  pool: UtxoPool;
+}): Promise<PieceReceipt> {
+  const { viewer, holders, satsPerPiece, pool } = opts;
+  if (satsPerPiece <= 0) throw new Error('satsPerPiece must be > 0');
+  if (holders.length === 0) throw new Error('holders must be non-empty');
+
+  const slot = pool.allocate();
+  if (!slot) {
+    throw new Error('UtxoPool exhausted — every slot is frozen or at max chain depth');
+  }
+
+  const tx = await buildPiecePaymentTx({
+    viewer,
+    holders,
+    satsPerPiece,
+    sourceTx: slot.sourceTx,
+    sourceVout: slot.vout,
+  });
+
+  const result = await viewer.broadcast(tx);
+  if (!result.success) {
+    throw new Error(`Piece broadcast failed: ${result.error}`);
+  }
+
+  // The change output is the last output in the tx by construction
+  // (see buildPiecePaymentTx): fan-out outputs first, change last.
+  const changeVout = tx.outputs.length - 1;
+  const changeSats = tx.outputs[changeVout]?.satoshis ?? 0;
+  pool.record(slot, tx, changeVout, changeSats);
+
+  return {
+    txid: result.txid,
+    txHex: tx.toHex(),
+    satsPerPiece,
+    holderCount: holders.length,
+    broadcastAt: Date.now(),
+  };
+}
+
+/**
  * Fetch a UTXO from WhatsOnChain, build a per-piece fan-out,
- * broadcast it, and return the receipt.
+ * broadcast it, and return the receipt. Kept for tests and
+ * backwards compatibility; the live swarm uses the pooled variant.
  */
 export async function broadcastPiecePayment(opts: {
   viewer: Wallet;

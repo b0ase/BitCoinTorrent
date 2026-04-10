@@ -20,6 +20,8 @@
  *   --sats-per-piece N   fan-out budget per piece (default 10)
  *   --port N             dashboard http port (default 8500)
  *   --no-stream          run only the agent tick loops, skip streaming
+ *   --slots N            pool slot count primed before streaming (default 100)
+ *   --sats-per-slot N    sats allocated to each pool slot (default 500)
  */
 
 import Fastify from 'fastify';
@@ -32,6 +34,7 @@ import { registerAgentRoutes } from '../src/agents/server-routes.js';
 import { registerDashboardRoutes } from '../src/agents/dashboard-routes.js';
 import { StreamingLoop } from '../src/agents/streaming-loop.js';
 import type { TokenHolderShare } from '../src/agents/piece-payment.js';
+import { UtxoPool } from '../src/agents/utxo-pool.js';
 
 function parseFlags(argv: string[]): Record<string, string | boolean> {
   const out: Record<string, string | boolean> = {};
@@ -56,6 +59,8 @@ async function main() {
   const satsPerPiece = Number(flags['sats-per-piece'] ?? 10);
   const port = Number(flags.port ?? 8500);
   const skipStream = flags['no-stream'] === true;
+  const slotCount = Number(flags.slots ?? 100);
+  const satsPerSlot = Number(flags['sats-per-slot'] ?? 500);
 
   const config = await loadAgentConfig();
   if (!config) {
@@ -104,6 +109,33 @@ async function main() {
     getActiveStreams: () => activeLoops.size,
   };
 
+  // Shared UTXO pool for the viewer wallet. Primed once up front so
+  // the streaming hot loop never has to hit WhatsOnChain for UTXOs
+  // or source transactions, and so consecutive piece broadcasts sit
+  // on parallel chains rather than one long chain that trips the
+  // "too-long-mempool-chain" relay policy.
+  let pool: UtxoPool | null = null;
+  if (viewerWallet && !skipStream) {
+    pool = new UtxoPool({ maxChainDepth: 20, cooldownMs: 12 * 60 * 1000 });
+    console.log(
+      `Priming UTXO pool: ${slotCount} slots × ${satsPerSlot} sats ` +
+        `(${(slotCount * satsPerSlot).toLocaleString()} sats locked in split tx)`,
+    );
+    try {
+      const { splitTxid } = await pool.prime({
+        wallet: viewerWallet,
+        slotCount,
+        satsPerSlot,
+      });
+      console.log(`Pool primed. Split txid: ${splitTxid}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Pool prime failed: ${msg}`);
+      console.error('Streaming will be disabled. Fund the seeder or adjust --slots/--sats-per-slot.');
+      pool = null;
+    }
+  }
+
   // Fastify server hosts registry + dashboard
   const app = Fastify({ logger: false });
   registerAgentRoutes(app, { registry: swarm.registry });
@@ -120,6 +152,10 @@ async function main() {
   const spawnStreamFor = (offer: ProductionOffer) => {
     if (!viewerWallet || activeLoops.has(offer.id)) return;
     if (offer.subscribers.length === 0) return;
+    if (!pool) {
+      // Pool never primed (or prime failed) — streaming is disabled
+      return;
+    }
     const holders: TokenHolderShare[] = offer.subscribers.map((s) => ({
       address: s.address,
       weight: s.sats,
@@ -129,6 +165,7 @@ async function main() {
       holders,
       satsPerPiece,
       piecesPerSecond,
+      pool,
       onPiece: (receipt) => {
         pieceTxCount++;
         totalSatsDistributed += receipt.satsPerPiece;

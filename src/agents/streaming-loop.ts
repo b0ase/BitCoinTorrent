@@ -18,9 +18,11 @@
 import type { Wallet } from '../payment/wallet.js';
 import {
   broadcastPiecePayment,
+  broadcastPiecePaymentPooled,
   type TokenHolderShare,
   type PieceReceipt,
 } from './piece-payment.js';
+import type { UtxoPool } from './utxo-pool.js';
 
 export interface StreamingLoopOptions {
   viewer: Wallet;
@@ -38,6 +40,13 @@ export interface StreamingLoopOptions {
    * The loop keeps running regardless; skip count is incremented.
    */
   onError?: (err: Error, attempt: number) => void;
+  /**
+   * Optional pre-primed UtxoPool. When provided, the loop uses
+   * broadcastPiecePaymentPooled which reuses cached source
+   * transactions and avoids WhatsOnChain UTXO / tx fetches on every
+   * piece. Strongly recommended for any sustained run.
+   */
+  pool?: UtxoPool;
   /**
    * Optional callback the loop calls INSTEAD of broadcastPiecePayment.
    * Used by unit tests to avoid network traffic. When provided, the
@@ -123,14 +132,34 @@ export class StreamingLoop {
    * Fire a single broadcast immediately, outside the interval. The
    * live swarm calls this at startup to emit a first TX without
    * waiting a full interval.
+   *
+   * Precedence:
+   *   - explicit broadcaster (tests) wins
+   *   - else if a pool was provided, use the pooled hot path
+   *   - else fall back to fetchUtxos-every-time (legacy, network-heavy)
    */
   async fireOnce(): Promise<PieceReceipt> {
-    const broadcaster = this.opts.broadcaster ?? broadcastPiecePayment;
-    const receipt = await broadcaster({
-      viewer: this.opts.viewer,
-      holders: this.opts.holders,
-      satsPerPiece: this.opts.satsPerPiece,
-    });
+    let receipt: PieceReceipt;
+    if (this.opts.broadcaster) {
+      receipt = await this.opts.broadcaster({
+        viewer: this.opts.viewer,
+        holders: this.opts.holders,
+        satsPerPiece: this.opts.satsPerPiece,
+      });
+    } else if (this.opts.pool) {
+      receipt = await broadcastPiecePaymentPooled({
+        viewer: this.opts.viewer,
+        holders: this.opts.holders,
+        satsPerPiece: this.opts.satsPerPiece,
+        pool: this.opts.pool,
+      });
+    } else {
+      receipt = await broadcastPiecePayment({
+        viewer: this.opts.viewer,
+        holders: this.opts.holders,
+        satsPerPiece: this.opts.satsPerPiece,
+      });
+    }
     this.piecesBroadcast++;
     this.opts.onPiece?.(receipt);
     return receipt;

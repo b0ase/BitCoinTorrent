@@ -10,6 +10,38 @@ import type { UTXO, BroadcastResult } from '../types/payment.js';
 
 const WOC_BASE = 'https://api.whatsonchain.com/v1/bsv/main';
 
+/**
+ * Retry a fetch with exponential backoff when the response is 429
+ * (rate-limited) or a transient 5xx. The decision to retry is made
+ * on the HTTP response itself, so fetch-level exceptions (DNS, abort)
+ * still throw on the first attempt.
+ *
+ * delayMs schedule: 250 -> 500 -> 1000 -> 2000 -> 4000 with ±20% jitter.
+ * Total worst-case wait: ~8 seconds across 5 attempts.
+ */
+async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  maxAttempts = 5,
+): Promise<Response> {
+  let attempt = 0;
+  let lastRes: Response | null = null;
+  while (attempt < maxAttempts) {
+    const res = await fetch(url, init);
+    if (res.ok) return res;
+    const shouldRetry = res.status === 429 || (res.status >= 500 && res.status < 600);
+    if (!shouldRetry) return res;
+    lastRes = res;
+    attempt++;
+    if (attempt >= maxAttempts) break;
+    const base = 250 * Math.pow(2, attempt - 1);
+    const jitter = base * (Math.random() * 0.4 - 0.2);
+    const delay = Math.round(base + jitter);
+    await new Promise((r) => setTimeout(r, delay));
+  }
+  return lastRes!;
+}
+
 export class Wallet {
   readonly privateKey: PrivateKey;
   readonly address: string;
@@ -29,7 +61,7 @@ export class Wallet {
 
   /** Fetch unspent outputs from WhatsOnChain */
   async fetchUtxos(): Promise<UTXO[]> {
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `${WOC_BASE}/address/${this.address}/unspent`,
       { signal: AbortSignal.timeout(10_000) },
     );
@@ -137,7 +169,7 @@ export class Wallet {
 
   /** Fetch a raw transaction by TXID and parse it */
   async fetchTransaction(txid: string): Promise<Transaction> {
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `${WOC_BASE}/tx/${txid}/hex`,
       { signal: AbortSignal.timeout(10_000) },
     );
@@ -151,7 +183,7 @@ export class Wallet {
   /** Broadcast a signed transaction */
   async broadcast(tx: Transaction): Promise<BroadcastResult> {
     const hex = tx.toHex();
-    const res = await fetch(`${WOC_BASE}/tx/raw`, {
+    const res = await fetchWithRetry(`${WOC_BASE}/tx/raw`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ txhex: hex }),
