@@ -32,6 +32,7 @@
 
 import { Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
 import type { Wallet } from '../payment/wallet.js';
+import type { TxBroadcaster } from '../payment/broadcaster.js';
 
 export interface UtxoSlot {
   sourceTx: Transaction;
@@ -131,8 +132,15 @@ export class UtxoPool {
      * a freshly funded output whose ancestry is known-shallow.
      */
     preferTxid?: string;
+    /**
+     * Optional alternative broadcaster (e.g. ArcBroadcaster) for the
+     * split-tx broadcast. When omitted the wallet's own broadcast()
+     * method is used, which hits WhatsOnChain. Useful when WoC's
+     * mempool view is tangled from prior runs.
+     */
+    broadcaster?: TxBroadcaster;
   }): Promise<{ splitTxid: string }> {
-    const { wallet, slotCount, satsPerSlot, preferTxid } = opts;
+    const { wallet, slotCount, satsPerSlot, preferTxid, broadcaster } = opts;
     if (slotCount <= 0) throw new Error('slotCount must be > 0');
     if (satsPerSlot <= 0) throw new Error('satsPerSlot must be > 0');
 
@@ -171,7 +179,9 @@ export class UtxoPool {
     await splitTx.fee(new SatoshisPerKilobyte(1));
     await splitTx.sign();
 
-    const result = await wallet.broadcast(splitTx);
+    const result = broadcaster
+      ? await broadcaster.broadcast(splitTx)
+      : await wallet.broadcast(splitTx);
     if (!result.success) {
       throw new Error(`Split broadcast failed: ${result.error}`);
     }

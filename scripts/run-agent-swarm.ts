@@ -72,17 +72,36 @@ async function main() {
   const maxInflight = Number(flags.inflight ?? 3);
   const maxOpenOffers = Number(flags['max-offers'] ?? 5);
 
-  // Prefer Taal ARC for piece broadcasts when a key is available.
-  // Env: TAAL_ARC_API_KEY=mainnet_xxxxxxxxxxxxxxxx...
-  // Falls back to the viewer's own wallet.broadcast() (WhatsOnChain)
-  // when no key is set.
+  // Piece broadcaster selection.
+  //   --arc                          → GorillaPool public ARC (no key needed)
+  //   --arc-endpoint URL             → custom ARC endpoint
+  //   env TAAL_ARC_API_KEY=mainnet_… → Taal ARC with the key
+  //   otherwise                      → WhatsOnChain via viewer.broadcast()
   let pieceBroadcaster: TxBroadcaster | undefined;
   const arcKey = process.env.TAAL_ARC_API_KEY;
-  if (arcKey && arcKey.length > 0) {
-    pieceBroadcaster = new ArcBroadcaster({ apiKey: arcKey });
+  const arcEndpoint =
+    typeof flags['arc-endpoint'] === 'string'
+      ? (flags['arc-endpoint'] as string)
+      : flags.arc === true
+        ? 'https://arc.gorillapool.io'
+        : undefined;
+  if (arcEndpoint) {
+    pieceBroadcaster = new ArcBroadcaster({
+      endpoint: arcEndpoint,
+      apiKey: arcKey,
+    });
+    console.log(
+      `Piece broadcaster: ARC at ${arcEndpoint}` +
+        (arcKey ? ` (key: ${arcKey.slice(0, 12)}...)` : ' (anonymous)'),
+    );
+  } else if (arcKey && arcKey.length > 0) {
+    pieceBroadcaster = new ArcBroadcaster({
+      endpoint: 'https://api.taal.com/arc',
+      apiKey: arcKey,
+    });
     console.log(`Piece broadcaster: Taal ARC (key: ${arcKey.slice(0, 12)}...)`);
   } else {
-    console.log('Piece broadcaster: WhatsOnChain (default, no TAAL_ARC_API_KEY set)');
+    console.log('Piece broadcaster: WhatsOnChain (default; pass --arc for GorillaPool)');
   }
 
   const config = await loadAgentConfig();
@@ -150,6 +169,7 @@ async function main() {
         slotCount,
         satsPerSlot,
         preferTxid: primeTxid,
+        broadcaster: pieceBroadcaster,
       });
       console.log(`Pool primed. Split txid: ${splitTxid}`);
     } catch (err) {

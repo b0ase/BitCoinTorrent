@@ -9,7 +9,7 @@
  * caring which one is active.
  */
 
-import { ARC, type Transaction } from '@bsv/sdk';
+import { ARC, FetchHttpClient, type Transaction } from '@bsv/sdk';
 import type { Wallet } from './wallet.js';
 import type { BroadcastResult } from '../types/payment.js';
 
@@ -42,10 +42,25 @@ export class ArcBroadcaster implements TxBroadcaster {
   readonly name: string;
   private readonly arc: ARC;
 
-  constructor(opts: { apiKey: string; endpoint?: string; label?: string }) {
-    const endpoint = opts.endpoint ?? 'https://api.taal.com/arc';
+  /**
+   * `apiKey` is optional — GorillaPool's public ARC endpoint at
+   * arc.gorillapool.io accepts anonymous submissions. Taal's
+   * endpoint requires a key registered at platform.taal.com.
+   */
+  constructor(opts: { apiKey?: string; endpoint?: string; label?: string }) {
+    const endpoint = opts.endpoint ?? 'https://arc.gorillapool.io';
     this.name = opts.label ?? `arc:${endpoint.replace(/^https?:\/\//, '')}`;
-    this.arc = new ARC(endpoint, opts.apiKey);
+    // @bsv/sdk's ARC class requires an explicit HttpClient in Node.
+    // defaultHttpClient() returns something that silently fails with
+    // "No method available to perform HTTP request"; explicit
+    // FetchHttpClient bound to global fetch works reliably.
+    const httpClient = new FetchHttpClient(
+      globalThis.fetch.bind(globalThis) as unknown as ConstructorParameters<typeof FetchHttpClient>[0],
+    );
+    this.arc = new ARC(endpoint, {
+      httpClient,
+      ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
+    });
   }
 
   async broadcast(tx: Transaction): Promise<BroadcastResult> {
@@ -71,13 +86,22 @@ export class ArcBroadcaster implements TxBroadcaster {
 
 /**
  * Factory: build the appropriate broadcaster for a wallet based on
- * the environment. Checks TAAL_ARC_API_KEY first; if present, returns
- * an ArcBroadcaster. Otherwise falls back to WocBroadcaster.
+ * the environment.
+ *
+ * Priority:
+ *   1. ARC_ENDPOINT set → ArcBroadcaster pointing at that URL,
+ *      using TAAL_ARC_API_KEY if present
+ *   2. TAAL_ARC_API_KEY set → ArcBroadcaster at Taal default
+ *   3. otherwise WocBroadcaster (free, rate-limited)
  */
 export function pickBroadcaster(wallet: Wallet): TxBroadcaster {
+  const endpoint = process.env.ARC_ENDPOINT;
   const key = process.env.TAAL_ARC_API_KEY;
+  if (endpoint) {
+    return new ArcBroadcaster({ endpoint, apiKey: key });
+  }
   if (key && key.length > 0) {
-    return new ArcBroadcaster({ apiKey: key });
+    return new ArcBroadcaster({ endpoint: 'https://api.taal.com/arc', apiKey: key });
   }
   return new WocBroadcaster(wallet);
 }
