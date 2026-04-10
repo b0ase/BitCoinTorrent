@@ -22,6 +22,14 @@ export interface ProducerConfig {
   maxOpenOffers: number;
   /** Source of production ideas — producer cycles through these titles */
   productionIdeas: string[];
+  /**
+   * Optional async hook fired after proposeProduction posts an
+   * offer into the registry. The live swarm plugs in a mint-presale
+   * callback here so the producer broadcasts a BSV-21 token on
+   * mainnet for every offer it posts. Errors are logged to the
+   * agent log but do not crash the tick loop.
+   */
+  onOfferPosted?: (offer: ProductionOffer) => Promise<void>;
 }
 
 export class ProducerAgent extends Agent {
@@ -83,6 +91,19 @@ export class ProducerAgent extends Agent {
       message: `Posted offer ${offer.id}: "${pickedTitle}" for ${this.cfg.budgetSats} sats (token ${tokenTicker})`,
       data: { offerId: offer.id, tokenTicker, requiredSats: this.cfg.budgetSats },
     });
+
+    // Fire-and-forget the on-chain mint hook if provided. Errors
+    // are captured in the agent log; the tick loop keeps running.
+    if (this.cfg.onOfferPosted) {
+      const hook = this.cfg.onOfferPosted;
+      void hook(offer).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.record({
+          kind: 'error',
+          message: `onOfferPosted hook failed for ${offer.id}: ${message}`,
+        });
+      });
+    }
     return offer;
   }
 

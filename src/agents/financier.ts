@@ -33,6 +33,13 @@ export interface FinancierConfig {
   thesis: FinancierThesis;
   /** Max concurrent subscriptions */
   maxPositions: number;
+  /**
+   * Optional async hook fired after subscribeToOffer succeeds.
+   * The live swarm plugs in a broadcast-on-chain callback here so
+   * the financier's subscription becomes a real BSV payment to the
+   * producer. Errors are logged; the tick loop keeps running.
+   */
+  onSubscribed?: (offer: ProductionOffer, sats: number) => Promise<void>;
 }
 
 export class FinancierAgent extends Agent {
@@ -109,6 +116,19 @@ export class FinancierAgent extends Agent {
       message: `Subscribed to ${offer.id} "${offer.title}" with ${sats} sats`,
       data: { offerId: offer.id, sats, producerId: offer.producerId },
     });
+
+    // Fire-and-forget on-chain broadcast hook if provided. The hook
+    // owns the actual BSV transfer to the producer address.
+    if (this.cfg.onSubscribed) {
+      const hook = this.cfg.onSubscribed;
+      void hook(offer, sats).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.record({
+          kind: 'error',
+          message: `onSubscribed hook failed for ${offer.id}: ${message}`,
+        });
+      });
+    }
     return sub;
   }
 
