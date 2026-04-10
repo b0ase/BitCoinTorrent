@@ -322,9 +322,98 @@
       text-transform: uppercase; letter-spacing: -0.03em;
     }
     .empty p { color: #ccc; font-size: 0.75rem; margin-top: 0.5rem; }
+
+    /* ─── Sidebar (Electron only) ─── */
+    .sidebar { display: none; }
+    body.electron .sidebar {
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 280px; background: #fafafa;
+      border-right: 2px solid #000; z-index: 20;
+      font-family: 'Inter', -apple-system, sans-serif;
+    }
+    body.electron { padding-left: 280px; }
+    .sb-head {
+      padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid #000;
+    }
+    .sb-title {
+      font-size: 1.1rem; font-weight: 900; letter-spacing: -0.02em;
+      text-transform: uppercase; color: #000;
+    }
+    .sb-count {
+      font-size: 0.55rem; color: #999; margin-top: 0.3rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    .sb-filters {
+      display: flex; gap: 0; padding: 0 1.5rem;
+      border-bottom: 1px solid #eee;
+    }
+    .sb-filter {
+      padding: 0.7rem 0.8rem 0.7rem 0; font-size: 0.55rem;
+      font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #bbb; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .sb-filter.active { color: #000; border-color: #000; }
+    .sb-filter:hover { color: #000; }
+    .sb-files { flex: 1; overflow-y: auto; padding: 0.3rem 0; }
+    .sb-file {
+      padding: 0.7rem 1.5rem; cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      border-left: 2px solid transparent;
+      transition: background 0.1s;
+    }
+    .sb-file:hover {
+      background: #fff; border-left-color: #000;
+    }
+    .sb-file .name {
+      font-size: 0.75rem; font-weight: 600; color: #000;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sb-file .meta {
+      font-size: 0.55rem; color: #999; margin-top: 0.2rem;
+      letter-spacing: 0.05em;
+    }
+    .sb-file.busy { opacity: 0.5; pointer-events: none; }
+    .sb-file.busy .name::after {
+      content: ' · INGESTING…'; color: #999; font-weight: 400;
+    }
+    .sb-empty {
+      padding: 2rem 1.5rem; font-size: 0.65rem; color: #bbb;
+      text-align: center; letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .sb-foot {
+      padding: 1rem 1.5rem; border-top: 1px solid #eee;
+    }
+    .sb-add {
+      width: 100%; padding: 0.6rem; background: none;
+      border: 1px solid #ddd; font-family: inherit;
+      font-size: 0.55rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: pointer; color: #000;
+    }
+    .sb-add:hover { border-color: #000; }
   </style>
 </head>
 <body>
+  <aside class="sidebar">
+    <div class="sb-head">
+      <div class="sb-title">Library</div>
+      <div class="sb-count" id="sb-count">&mdash;</div>
+    </div>
+    <div class="sb-filters">
+      <div class="sb-filter active" data-filter="all" onclick="filterLib('all', this)">All</div>
+      <div class="sb-filter" data-filter="video" onclick="filterLib('video', this)">Video</div>
+      <div class="sb-filter" data-filter="audio" onclick="filterLib('audio', this)">Audio</div>
+    </div>
+    <div class="sb-files" id="sb-files">
+      <div class="sb-empty">Scanning&hellip;</div>
+    </div>
+    <div class="sb-foot">
+      <button class="sb-add" onclick="addContentFolder()">+ Add Folder</button>
+    </div>
+  </aside>
+
   <header>
     <h1>BITCOINTORRENT</h1>
     <div class="tagline">Peer-to-peer streaming &mdash; BSV micropayments</div>
@@ -346,28 +435,12 @@
       <button id="settings-btn" class="btn-outline" onclick="showSettings()">Settings</button>
     </div>
 
-    <div id="nav-tabs" class="lib-tabs" style="margin-bottom:1.5rem">
-      <div class="lib-tab active" id="tab-catalog" onclick="showTab('catalog')">Streaming</div>
-      <div class="lib-tab" id="tab-library" onclick="showTab('library')" style="display:none">My Library</div>
-    </div>
-
     <button id="back" onclick="showCatalog()">&larr; Back</button>
     <div id="catalog">
       <div class="empty">
         <h2>No content</h2>
         <p>Seed a video to get started.</p>
       </div>
-    </div>
-
-    <div id="library">
-      <h2>MY LIBRARY</h2>
-      <div class="lib-count" id="lib-count">Scanning folders...</div>
-      <div id="lib-filter" class="lib-tabs" style="border-bottom:1px solid #eee;margin-bottom:0.5rem;">
-        <div class="lib-tab active" onclick="filterLib('all')">All</div>
-        <div class="lib-tab" onclick="filterLib('video')">Video</div>
-        <div class="lib-tab" onclick="filterLib('audio')">Audio</div>
-      </div>
-      <div id="lib-files"></div>
     </div>
 
     <div id="settings">
@@ -754,7 +827,8 @@
     setInterval(loadWallet, 30000);
 
     if (window.bitcointorrent?.isElectron) {
-      document.getElementById('tab-library').style.display = '';
+      document.body.classList.add('electron');
+      loadSidebar();
     }
 
     // ─── Add Content ────────────────────────────────
@@ -802,33 +876,33 @@
       input.click();
     }
 
-    // ─── Tab Navigation ─────────────────────────────────
+    // ─── Tab Navigation (catalog ↔ player ↔ settings) ───
     function showTab(tab) {
       document.getElementById('catalog').style.display = tab === 'catalog' ? '' : 'none';
-      document.getElementById('library').classList.toggle('on', tab === 'library');
       document.getElementById('settings').classList.remove('on');
       document.getElementById('player').classList.remove('on');
       document.getElementById('back').style.display = 'none';
-      document.querySelectorAll('#nav-tabs .lib-tab').forEach(t => t.classList.remove('active'));
-      document.getElementById(`tab-${tab}`).classList.add('active');
-      if (tab === 'library') loadLibrary();
     }
 
-    // ─── Library ────────────────────────────────────────
+    // ─── Sidebar Library (Electron) ─────────────────────
     let allMediaFiles = [];
     let currentFilter = 'all';
 
     const VIDEO_EXTS = ['MP4', 'MKV', 'MOV', 'AVI', 'WEBM'];
     const AUDIO_EXTS = ['MP3', 'M4A', 'FLAC', 'WAV'];
 
-    async function loadLibrary() {
+    const sbEscape = s => String(s).replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+
+    async function loadSidebar() {
       if (!window.bitcointorrent?.listMedia) return;
-      document.getElementById('lib-count').textContent = 'Scanning folders...';
+      document.getElementById('sb-count').textContent = 'Scanning…';
       allMediaFiles = await window.bitcointorrent.listMedia();
-      renderLibrary();
+      renderSidebar();
     }
 
-    function renderLibrary() {
+    function renderSidebar() {
       let files = allMediaFiles;
       if (currentFilter === 'video') files = files.filter(f => VIDEO_EXTS.includes(f.ext));
       if (currentFilter === 'audio') files = files.filter(f => AUDIO_EXTS.includes(f.ext));
@@ -836,44 +910,58 @@
       const total = allMediaFiles.length;
       const vids = allMediaFiles.filter(f => VIDEO_EXTS.includes(f.ext)).length;
       const auds = allMediaFiles.filter(f => AUDIO_EXTS.includes(f.ext)).length;
-      document.getElementById('lib-count').textContent = `${total} files — ${vids} video, ${auds} audio`;
+      document.getElementById('sb-count').textContent =
+        `${total} files · ${vids} video · ${auds} audio`;
 
-      const el = document.getElementById('lib-files');
+      const el = document.getElementById('sb-files');
       if (!files.length) {
-        el.innerHTML = '<div class="empty"><h2>EMPTY</h2><p>No media files in your content folders. Add folders in Settings.</p></div>';
+        el.innerHTML = '<div class="sb-empty">No media.<br>Add a folder below.</div>';
         return;
       }
 
       el.innerHTML = '';
       for (const f of files) {
         const div = document.createElement('div');
-        div.className = 'lib-file';
+        div.className = 'sb-file';
+        div.dataset.path = f.path;
         const sizeMB = (f.size / 1024 / 1024).toFixed(1);
-        const folderShort = f.folder.split('/').pop();
-        div.innerHTML = `
-          <div>
-            <div class="name">${f.name}</div>
-            <div class="meta">${folderShort} / ${sizeMB} MB</div>
-          </div>
-          <span class="ext">${f.ext}</span>
-        `;
+        div.innerHTML =
+          '<div class="name">' + sbEscape(f.name) + '</div>' +
+          '<div class="meta">' + f.ext + ' &middot; ' + sizeMB + ' MB</div>';
+        div.onclick = () => handleSidebarFileClick(f, div);
         el.appendChild(div);
       }
     }
 
-    function filterLib(filter) {
+    function filterLib(filter, btn) {
       currentFilter = filter;
-      document.querySelectorAll('#lib-filter .lib-tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
-      renderLibrary();
+      document.querySelectorAll('.sb-filter').forEach(t => t.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderSidebar();
+    }
+
+    async function handleSidebarFileClick(file, row) {
+      if (!window.bitcointorrent?.ingestFile) return;
+      row.classList.add('busy');
+      log(`Ingesting: ${file.name}`);
+      try {
+        const result = await window.bitcointorrent.ingestFile(file.path);
+        if (result?.error) {
+          log(`Ingest failed: ${result.error}`, 'err');
+          return;
+        }
+        log(`Seeded: ${result.title}`);
+        await loadCatalog();
+        openTokenizeModal(result.infohash, result.title);
+      } finally {
+        row.classList.remove('busy');
+      }
     }
 
     // ─── Settings ───────────────────────────────────────
     async function showSettings() {
       document.getElementById('catalog').style.display = 'none';
-      document.getElementById('library').classList.remove('on');
       document.getElementById('player').classList.remove('on');
-      document.getElementById('nav-tabs').style.display = 'none';
       document.getElementById('settings').classList.add('on');
 
       if (!window.bitcointorrent) return;
@@ -889,7 +977,6 @@
 
     function hideSettings() {
       document.getElementById('settings').classList.remove('on');
-      document.getElementById('nav-tabs').style.display = '';
       showTab('catalog');
     }
 
@@ -912,7 +999,8 @@
       const folder = await window.bitcointorrent.addFolder();
       if (folder) {
         const cfg = await window.bitcointorrent.getConfig();
-        renderFolders(cfg.contentFolders);
+        if (document.getElementById('set-folders')) renderFolders(cfg.contentFolders);
+        loadSidebar();
       }
     }
 
@@ -921,6 +1009,7 @@
       await window.bitcointorrent.removeFolder(folder);
       const cfg = await window.bitcointorrent.getConfig();
       renderFolders(cfg.contentFolders);
+      loadSidebar();
     }
 
     async function regenWallet(which) {

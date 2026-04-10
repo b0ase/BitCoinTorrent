@@ -262,6 +262,37 @@ function setupIPC() {
     return files.sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  // Ingest a single file by path (from sidebar click) — seeds + returns infohash
+  ipcMain.handle('ingest-file', async (_event, videoPath: string) => {
+    if (!config || !server) return { error: 'Not ready' };
+
+    const title = videoPath
+      .split('/').pop()!
+      .replace(/\.[^.]+$/, '')
+      .replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+
+    try {
+      const ingestResult = await ingest({
+        videoPath,
+        title,
+        creatorAddress: new Wallet(config.seederWif).address,
+        satsPerPiece: config.pricePerPiece,
+        outputDir: DATA_DIR,
+      });
+
+      const seeded = await server.seeder.seed(ingestResult.fmp4Path, ingestResult.manifest);
+      server.manifests.set(seeded.infohash, { ...ingestResult.manifest, infohash: seeded.infohash });
+      server.magnetURIs.set(seeded.infohash, seeded.torrent.magnetURI);
+      server.fmp4Paths.set(seeded.infohash, ingestResult.fmp4Path);
+
+      updateTrayMenu();
+      return { infohash: seeded.infohash, title };
+    } catch (err: any) {
+      return { error: err.message || String(err) };
+    }
+  });
+
   // Tokenize content: mint a BSV-21 token linked to a video
   ipcMain.handle('tokenize', async (_event, opts: {
     infohash: string;
