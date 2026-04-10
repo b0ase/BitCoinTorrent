@@ -8,6 +8,9 @@ data/
 .pnpmrc.json
 .vscode/
 
+# Agent swarm runtime configuration (contains WIF keys — NEVER commit)
+config/agents.json
+
 # Electron build artifacts (generated from source)
 electron/main.mjs
 electron/main.mjs.map
