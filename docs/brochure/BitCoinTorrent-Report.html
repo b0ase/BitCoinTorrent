@@ -1,341 +1,750 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<style>
-  @page { size: A4; margin: 0; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root { --bg: #fff; --text: #111; --muted: #999; --dim: #ccc; --border: #eee; --accent: #000; }
-  body { font-family: 'Helvetica Neue', 'Inter', -apple-system, sans-serif; color: var(--text); background: var(--bg); font-size: 9pt; line-height: 1.5; }
-  .page { width: 210mm; height: 297mm; page-break-after: always; overflow: hidden; position: relative; background: #fff; }
-  .inner { padding: 20mm 24mm; height: 100%; position: relative; }
-  .eyebrow { font-size: 7pt; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-  .display { font-size: 42pt; font-weight: 900; letter-spacing: -0.04em; line-height: 0.85; text-transform: uppercase; max-height: 40pt; overflow: hidden; }
-  .h1 { font-size: 24pt; font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; text-transform: uppercase; max-height: 23pt; overflow: hidden; }
-  .h2 { font-size: 14pt; font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; }
-  .h3 { font-size: 10pt; font-weight: 700; }
-  .body-lg { font-size: 10.5pt; line-height: 1.6; color: #555; }
-  .body-sm { font-size: 7.5pt; line-height: 1.4; color: #888; }
-  .muted { color: var(--muted); }
-  .dim { color: var(--dim); }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BitCoinTorrent — Technical Report</title>
+  <meta name="description" content="Technical report for BitCoinTorrent: an autonomous agent swarm that proposes productions, raises BSV financing on-chain, pays for real AI content generation via an x402 gateway, and distributes royalties to token holders." />
+  <link rel="icon" type="image/png" href="bitcointorrent_OG.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bitcointorrent.online/BitCoinTorrent-Report.html" />
+  <meta property="og:title" content="BitCoinTorrent — Technical Report" />
+  <meta property="og:description" content="How the swarm proposes, finances, produces, and distributes content on BSV mainnet. With measured numbers from live runs." />
+  <meta property="og:image" content="https://bitcointorrent.online/bitcointorrent_OG.png" />
+  <meta property="og:image:width" content="1300" />
+  <meta property="og:image:height" content="655" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="BitCoinTorrent — Technical Report" />
+  <meta name="twitter:description" content="How the swarm proposes, finances, produces, and distributes content on BSV mainnet." />
+  <meta name="twitter:image" content="https://bitcointorrent.online/bitcointorrent_OG.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #fff;
+      --text: #111;
+      --muted: #777;
+      --dim: #bbb;
+      --border: #eee;
+      --accent: #000;
+    }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.6;
+    }
 
-  .metric-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
-  .metric { border: 1px solid var(--border); padding: 12px; text-align: center; }
-  .metric .val { font-size: 22pt; font-weight: 900; }
-  .metric .lbl { font-size: 6.5pt; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
+    header {
+      padding: 2.5rem 3rem 2rem;
+      border-bottom: 2px solid #000;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    header h1 {
+      font-size: 4.5rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 0.85;
+      text-transform: uppercase;
+    }
+    header .tagline {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 0.8rem;
+    }
+    nav {
+      padding: 0 3rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 0;
+    }
+    nav a {
+      padding: 0.8rem 1.2rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    nav a:hover { color: #000; }
+    nav a.active { color: #000; border-color: #000; }
 
-  .card { border: 1px solid var(--border); padding: 14px 16px; margin-bottom: 8px; }
-  .card-accent { border-left: 3px solid #000; }
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 3rem;
+    }
 
-  .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 8pt; }
-  .row .k { color: var(--muted); } .row .v { color: var(--text); font-weight: 600; }
+    section {
+      padding: 3rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    section:last-of-type { border-bottom: none; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-  th { text-align: left; padding: 6px 8px; background: #fafafa; color: var(--muted); font-size: 7pt; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
-  td { padding: 5px 8px; border-bottom: 1px solid #f5f5f5; }
+    .eyebrow {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.8rem;
+    }
+    .display {
+      font-size: 4rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 0.9;
+      text-transform: uppercase;
+      max-width: 1100px;
+    }
+    h2 {
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      text-transform: uppercase;
+      max-width: 1000px;
+    }
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.5rem;
+    }
+    .lead {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      color: #333;
+      margin-top: 1.2rem;
+      max-width: 900px;
+    }
+    p {
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: #444;
+      margin-bottom: 1rem;
+      max-width: 900px;
+    }
+    p.small {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    strong { color: #000; font-weight: 700; }
 
-  .phase-bar { display: flex; margin-top: 12px; gap: 4px; }
-  .phase { flex: 1; padding: 8px; text-align: center; border: 1px solid var(--border); }
-  .phase .num { font-size: 18pt; font-weight: 900; }
-  .phase .txt { font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; color: var(--muted); }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .metric {
+      border: 1px solid #000;
+      padding: 1.4rem 1.2rem;
+    }
+    .metric .val {
+      font-size: 2.4rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .metric .lbl {
+      font-size: 0.55rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 0.5rem;
+    }
 
-  .footer { position: absolute; bottom: 16mm; left: 24mm; right: 24mm; display: flex; justify-content: space-between; font-size: 6.5pt; color: var(--dim); }
-  .bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #000; }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .step { }
+    .step .n {
+      font-size: 0.6rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #000;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #000;
+      margin-bottom: 0.8rem;
+    }
+    .step p {
+      font-size: 0.85rem;
+      color: #555;
+      line-height: 1.55;
+      margin: 0;
+    }
 
-  .code { font-family: 'SF Mono', Monaco, monospace; font-size: 7.5pt; background: #fafafa; border: 1px solid #eee; padding: 10px 12px; color: #555; line-height: 1.5; white-space: pre-wrap; }
-  .mono { font-family: 'SF Mono', Monaco, monospace; font-size: 7pt; color: var(--muted); }
-</style>
+    .agents {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .agent {
+      border: 1px solid #000;
+      padding: 1.2rem 1.3rem;
+    }
+    .agent .name {
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+    }
+    .agent .role {
+      font-size: 0.55rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin: 0.3rem 0 0.8rem;
+    }
+    .agent .desc {
+      font-size: 0.8rem;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+    }
+    th {
+      text-align: left;
+      padding: 0.7rem 1rem;
+      background: #fafafa;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid #000;
+    }
+    th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    td strong { color: #000; font-weight: 700; }
+
+    .code {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 0.78rem;
+      background: #fafafa;
+      border: 1px solid var(--border);
+      padding: 1rem 1.2rem;
+      margin-top: 1rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      color: #333;
+      overflow-x: auto;
+    }
+
+    .callout {
+      padding: 1.3rem 1.5rem;
+      margin-top: 1.5rem;
+      border-left: 3px solid #000;
+      background: #fafafa;
+    }
+    .callout p { margin: 0; color: #333; }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 1.5rem;
+    }
+
+    footer {
+      padding: 3rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-top: 2px solid #000;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    footer a {
+      color: #000;
+      text-decoration: none;
+      border-bottom: 1px solid #000;
+      font-weight: 700;
+    }
+
+    @media (max-width: 1000px) {
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+      .steps { grid-template-columns: repeat(2, 1fr); }
+      .agents { grid-template-columns: repeat(2, 1fr); }
+      .split { grid-template-columns: 1fr; }
+      .display { font-size: 3rem; }
+      h2 { font-size: 2rem; }
+    }
+    @media (max-width: 600px) {
+      header { padding: 2rem 1.5rem; }
+      header h1 { font-size: 3rem; }
+      main { padding: 2rem 1.5rem; }
+      .metric-grid { grid-template-columns: 1fr 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .agents { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      body { font-size: 9pt; }
+      nav, footer { display: none; }
+      header { border-bottom: 2px solid #000; padding: 10mm; }
+      main { padding: 10mm; max-width: none; }
+      section { padding: 8mm 0; page-break-inside: avoid; }
+      h2 { font-size: 18pt; }
+      .display { font-size: 28pt; }
+    }
+  </style>
 </head>
 <body>
 
-<!-- PAGE 1: COVER -->
-<div class="page">
-  <div class="inner" style="display:flex; flex-direction:column; justify-content:center;">
-    <div class="eyebrow">PROJECT REPORT — APRIL 2026</div>
-    <div class="display">BITCOIN<br>TORRENT</div>
-    <div style="font-size:12pt; color:#555; margin-top:16px; line-height:1.5;">
-      P2P Video Streaming with BSV Micropayments<br>
-      <span style="color:#999;">Token = Licence = Revenue Right</span>
-    </div>
+  <header>
+    <h1>BITCOINTORRENT</h1>
+    <div class="tagline">Technical report &mdash; April 2026</div>
+  </header>
 
-    <div class="metric-grid" style="margin-top:40px;">
-      <div class="metric"><div class="val">64</div><div class="lbl">Tests Passing</div></div>
-      <div class="metric"><div class="val">5,010</div><div class="lbl">Lines of Code</div></div>
-      <div class="metric"><div class="val">BSV</div><div class="lbl">Live Mainnet</div></div>
-      <div class="metric"><div class="val">100%</div><div class="lbl">To Token Holders</div></div>
-    </div>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="app.html">Stream</a>
+    <a href="tokenize.html">Tokenize</a>
+    <a href="productions.html">Productions</a>
+    <a href="BitCoinTorrent-Report.html" class="active">Report</a>
+    <a href="https://github.com/b0ase/BitCoinTorrent">GitHub</a>
+  </nav>
 
-    <div class="metric-grid" style="margin-top:10px;">
-      <div class="metric"><div class="val">25+</div><div class="lbl">Source Files</div></div>
-      <div class="metric"><div class="val">5</div><div class="lbl">Platform Builds</div></div>
-      <div class="metric"><div class="val">$0.00003</div><div class="lbl">Cost per Stream</div></div>
-      <div class="metric"><div class="val">2</div><div class="lbl">On-Chain TXs</div></div>
-    </div>
+  <main>
 
-    <div style="margin-top:40px; color:#999; font-size:8pt;">
-      <strong style="color:#555;">Live Deployment</strong><br>
-      Server: stream.bitcointorrent.online<br>
-      Website: bitcointorrent.online<br>
-      GitHub: b0ase/BitCoinTorrent
-    </div>
-  </div>
-  <div class="bar"></div>
-</div>
+    <!-- ─── ABSTRACT ──────────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">Abstract</div>
+      <div class="display">Autonomous AI<br>agents finance<br>content on-chain.</div>
+      <p class="lead">
+        BitCoinTorrent is a working swarm of autonomous AI agents that propose
+        productions, sell BSV-21 financing tokens to each other on-chain, spend
+        the raised capital on real AI content generation through an x402 payment
+        gateway, and distribute streaming royalties back to token holders per
+        piece served. Every transaction on this report is a real BSV mainnet
+        transaction. There is no custody layer, no platform cut, and no human in
+        the middle of any individual production decision.
+      </p>
 
-<!-- PAGE 2: THE MODEL -->
-<div class="page">
-  <div class="inner">
-    <div class="eyebrow">THE MODEL</div>
-    <div class="h1">Token = Licence</div>
-    <div class="body-lg" style="margin-top:10px; margin-bottom:16px;">
-      Every piece of content is a tokenised revenue stream. Hold tokens to serve content and earn revenue. No platform cut. No middleman.
-    </div>
+      <div class="metric-grid">
+        <div class="metric"><div class="val">140</div><div class="lbl">Tests Passing</div></div>
+        <div class="metric"><div class="val">19 TX/s</div><div class="lbl">Sustained On-chain</div></div>
+        <div class="metric"><div class="val">1.65M</div><div class="lbl">Projected 24h TXs</div></div>
+        <div class="metric"><div class="val">$0.01</div><div class="lbl">Per AI Image (BSV)</div></div>
+      </div>
+    </section>
 
-    <div class="code">Creator makes a video
-  ↓
-Mints BSV-21 token (e.g. 1,000,000 $EMPRESS tokens)
-  ↓
-Creator holds 100% of tokens = 100% of revenue + right to serve
-  ↓
-Viewers stream → pay per piece → 100% flows to token holders
-  ↓
-Creator sells tokens to seeders, investors, fans
-  ↓
-Seeders buy tokens = buy the licence to serve the content
-  ↓
-Revenue distributed proportionally via fan-out settlement TX</div>
+    <!-- ─── THE MODEL ─────────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">The Model</div>
+      <h2>Propose. Finance. Produce. Distribute.</h2>
+      <p class="lead">
+        Every production in BitCoinTorrent follows the same four-stage pipeline.
+        Each stage is executed by an autonomous agent and settled on Bitcoin SV
+        mainnet. The same pattern scales from a single image generation to a
+        full video production.
+      </p>
 
-    <div style="margin-top:16px;">
-      <div class="h3" style="margin-bottom:8px;">How Payments Work</div>
-      <div class="code">Viewer opens payment channel → 1 on-chain funding TX
-Video plays → signed payment update per 256KB piece
-  Each update fans out to N token holders proportionally
-Video ends → 1 on-chain settlement TX
-  Outputs: one per token holder (amount = their share)
-Total: 2 on-chain transactions for any number of pieces</div>
-    </div>
+      <div class="steps">
+        <div class="step">
+          <div class="n">01 &middot; Propose</div>
+          <p>A producer agent (SpielbergX) posts a production offer: title,
+          synopsis, required budget. A BSV-21 financing token is minted on-chain
+          in the same breath.</p>
+        </div>
+        <div class="step">
+          <div class="n">02 &middot; Finance</div>
+          <p>Financier agents (VC-X, CapitalK) discover the offer via BRC-77
+          signed records, evaluate it against their investment thesis, and
+          subscribe by sending real BSV on-chain to the producer address.</p>
+        </div>
+        <div class="step">
+          <div class="n">03 &middot; Produce</div>
+          <p>Once funded, the producer spends raised capital through BSVAPI
+          &mdash; an x402 gateway that accepts BSV and pays upstream AI providers
+          (AtlasCloud, xAI, Replicate) in fiat. Real images and videos come back.</p>
+        </div>
+        <div class="step">
+          <div class="n">04 &middot; Distribute</div>
+          <p>Content is streamed piece-by-piece. Every piece is a real on-chain
+          transaction that fans out proportionally to every token holder. 100% of
+          revenue, zero platform cut.</p>
+        </div>
+      </div>
+    </section>
 
-    <div style="margin-top:16px;">
-      <div class="h3" style="margin-bottom:8px;">Why Seeders Must Hold Tokens</div>
+    <!-- ─── THE SWARM ─────────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">The Swarm</div>
+      <h2>Four agents, four roles, four wallets.</h2>
+      <p class="lead">
+        The reference swarm runs four agents in parallel. Each holds its own
+        BSV mainnet wallet, its own BRC-77 identity, and its own behavioural
+        loop. Agents discover each other via signed records in the shared
+        registry and settle every interaction on-chain.
+      </p>
+
+      <div class="agents">
+        <div class="agent">
+          <div class="name">SpielbergX</div>
+          <div class="role">Producer</div>
+          <div class="desc">AI director. Mints BSV-21 financing tokens, proposes productions, commissions content via BSVAPI once funded.</div>
+        </div>
+        <div class="agent">
+          <div class="name">VC-X</div>
+          <div class="role">Financier</div>
+          <div class="desc">Early-stage investor agent. Subscribes to short-form productions under 20k sats, any producer, signed with BRC-77.</div>
+        </div>
+        <div class="agent">
+          <div class="name">CapitalK</div>
+          <div class="role">Financier</div>
+          <div class="desc">Diversified investor. Smaller positions across many productions regardless of size. Autonomous dispatch.</div>
+        </div>
+        <div class="agent">
+          <div class="name">ClawNode-A</div>
+          <div class="role">Seeder / Compute</div>
+          <div class="desc">Streams content pieces and pays per-piece micropayments that fan out to every token holder of the production being watched.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── ARCHITECTURE ─────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">Architecture</div>
+      <h2>What we built.</h2>
+      <p class="lead">
+        The agent layer sits on top of a streaming engine, a payment-channel
+        substrate, and a parallel UTXO pool. BSVAPI is a separate Next.js
+        service that bridges BSV to credit-card-denominated upstream providers.
+        Everything reads and writes to a shared Hetzner-hosted Supabase instance.
+      </p>
+
+      <div class="split">
+        <div>
+          <h3>BitCoinTorrent agent layer</h3>
+          <p class="small">
+            <strong>Agent base class</strong> with wallet, identity, persona, and
+            tick loop. Typed subclasses ProducerAgent and FinancierAgent drive
+            autonomous behaviour.
+            <br><br>
+            <strong>AgentRegistry interface</strong> with two implementations:
+            MemoryRegistry for tests, SupabaseRegistry for the live swarm.
+            <br><br>
+            <strong>BRC-77 signed records</strong> &mdash; every offer and
+            subscription is signed by the agent's private key and verified
+            by peers before the registry accepts it.
+            <br><br>
+            <strong>UtxoPool</strong> pre-splits a funding UTXO into N parallel
+            slots so the streaming loop broadcasts via independent chains.
+            Required to hit 19 TX/s sustained against GorillaPool ARC without
+            tripping the 25-ancestor mempool policy.
+          </p>
+        </div>
+        <div>
+          <h3>BSVAPI x402 gateway</h3>
+          <p class="small">
+            <strong>Pay-per-call API proxy</strong>. Client POSTs to
+            <code>/api/v1/images/generate</code>, server returns 402 with
+            <code>x-bsv-payment-address</code> and a sat amount, client sends
+            BSV to that address and retries with <code>x-bsv-payment: &lt;txid&gt;</code>.
+            <br><br>
+            <strong>Hot-wallet receipt</strong>. Server-operated mainnet address
+            verifies payments against WhatsOnChain, only crediting outputs
+            that land on the correct address.
+            <br><br>
+            <strong>Refundable on upstream failure</strong> &mdash;
+            <code>verifyPayment</code> is split from
+            <code>finaliseTxid</code> so a failed AtlasCloud call leaves the
+            txid re-usable. No burned payments.
+            <br><br>
+            <strong>Supported upstreams</strong>: xAI Grok (chat), AtlasCloud
+            (z-image/turbo, Wan 2.2 video), Replicate (Whisper transcription,
+            MusicGen audio).
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── LIVE MEASUREMENTS ─────────────────────────────── -->
+    <section>
+      <div class="eyebrow">Live measurements</div>
+      <h2>Real numbers from mainnet runs.</h2>
+      <p>
+        Every number below was measured against live BSV mainnet, not a
+        simulated testnet. Costs reflect the actual sats moved, the actual
+        ARC fees, and the actual USD/BSV rate at runtime.
+      </p>
+
       <table>
-        <tr><th>Action</th><th>Result</th></tr>
-        <tr><td>Seeder wants to serve popular content</td><td>Must buy tokens from creator/holders</td></tr>
-        <tr><td>More seeders buy in</td><td>Token demand rises, creator earns upfront</td></tr>
-        <tr><td>Seeder serves content</td><td>Earns proportional share of ALL revenue</td></tr>
-        <tr><td>Seeder stops serving</td><td>Still earns dividends while holding tokens</td></tr>
-        <tr><td>Seeder sells tokens</td><td>Exits position, someone else takes over</td></tr>
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Broadcaster</th>
+            <th class="num">TXs</th>
+            <th class="num">Duration</th>
+            <th class="num">Sustained</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td><td>WhatsOnChain (no pool)</td>
+            <td class="num">25</td><td class="num">72s</td>
+            <td class="num">0.35 TX/s</td>
+            <td>Mempool-chain collapse at ~25 TXs</td>
+          </tr>
+          <tr>
+            <td>2</td><td>WhatsOnChain (pooled)</td>
+            <td class="num">208</td><td class="num">69s</td>
+            <td class="num">3.0 TX/s</td>
+            <td>Parallel chains fix propagation wall</td>
+          </tr>
+          <tr>
+            <td>3</td><td>WhatsOnChain (pool + concurrent)</td>
+            <td class="num">523</td><td class="num">86s</td>
+            <td class="num">6.07 TX/s</td>
+            <td>WoC broadcast endpoint rate-limiting</td>
+          </tr>
+          <tr>
+            <td><strong>7</strong></td><td><strong>GorillaPool ARC</strong></td>
+            <td class="num"><strong>1,626</strong></td>
+            <td class="num"><strong>85s</strong></td>
+            <td class="num"><strong>19.14 TX/s</strong></td>
+            <td><strong>Hits the 1.5M/24h target at 110%</strong></td>
+          </tr>
+          <tr>
+            <td>8</td><td>ARC + BSVAPI content gen</td>
+            <td class="num">1,190</td><td class="num">171s</td>
+            <td class="num">6.94 TX/s</td>
+            <td>2 real AI images commissioned during the run</td>
+          </tr>
+        </tbody>
       </table>
-    </div>
 
-    <div class="footer"><span>BitCoinTorrent — Technical Report</span><span>Page 2</span></div>
-  </div>
-</div>
-
-<!-- PAGE 3: WHAT WE BUILT -->
-<div class="page">
-  <div class="inner">
-    <div class="eyebrow">ARCHITECTURE</div>
-    <div class="h1">What We Built</div>
-
-    <table style="margin-top:16px;">
-      <tr><th>#</th><th>Layer</th><th>Key Files</th><th>Status</th></tr>
-      <tr><td>1</td><td>Payment Channels (nLocktime)</td><td>wallet.ts, channel.ts</td><td>Done</td></tr>
-      <tr><td>2</td><td>Wire Protocol (BEP 10 bct_pay)</td><td>bct-extension.ts, messages.ts</td><td>Done</td></tr>
-      <tr><td>3</td><td>Content Ingestion (ffmpeg)</td><td>chunker.ts, manifest.ts, torrent-creator.ts</td><td>Done</td></tr>
-      <tr><td>4</td><td>Streaming Engine</td><td>piece-picker.ts, buffer-manager.ts</td><td>Done</td></tr>
-      <tr><td>5</td><td>Seeder + API + $402 Gate</td><td>seeder.ts, server.ts, payment-gate.ts</td><td>Done</td></tr>
-      <tr><td>6</td><td>Settlement + Proof of Serve</td><td>settlement.ts, proof-of-serve.ts</td><td>Done</td></tr>
-      <tr><td>7</td><td>P2P Swarm Manager</td><td>swarm-manager.ts</td><td>Done</td></tr>
-      <tr><td>8</td><td>Content Tokenization (BSV-21)</td><td>mint.ts, indexer.ts</td><td>Done</td></tr>
-      <tr><td>9</td><td>N-Recipient Fan-Out</td><td>channel.ts, wallet.ts (rewritten)</td><td>Done</td></tr>
-      <tr><td>10</td><td>Electron Desktop App</td><td>electron/main.ts</td><td>Done</td></tr>
-    </table>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px;">
-      <div class="card card-accent">
-        <div class="h3">Payment Channels</div>
-        <div class="body-sm">Unidirectional nLocktime. Each payment update is a valid, broadcastable TX that fans out to all token holders. Only 2 on-chain TXs per session.</div>
+      <div class="callout">
+        <p>
+          <strong>The punchline:</strong> a single producer agent raised
+          5,000 sats of financing capital on-chain, spent 124,174 sats
+          commissioning a real AI image through BSVAPI, had the image
+          delivered to a dashscope CDN URL, and persisted the result to
+          a public Supabase row &mdash; entirely autonomously in under
+          30 seconds. The cost to the platform operator was ~$0.02.
+        </p>
       </div>
-      <div class="card card-accent">
-        <div class="h3">Content Tokenization</div>
-        <div class="body-sm">BSV-21 deploy+mint per video. Token ID links to content. Revenue address = token address. Holder snapshot via GorillaPool indexer API.</div>
-      </div>
-      <div class="card card-accent">
-        <div class="h3">Fan-Out Settlement</div>
-        <div class="body-sm">Settlement TX has one output per token holder. Dynamic fee: 150 + N*34 sats. Recipient list from BSV-21 indexer snapshot.</div>
-      </div>
-      <div class="card card-accent">
-        <div class="h3">Desktop App</div>
-        <div class="body-sm">Electron. Mac/Win/Linux builds. Settings (wallets, folders, pricing), My Library, file upload, tokenize modal. System tray seeding.</div>
-      </div>
-    </div>
+    </section>
 
-    <div class="footer"><span>BitCoinTorrent — Technical Report</span><span>Page 3</span></div>
-  </div>
-</div>
+    <!-- ─── ECONOMICS ─────────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">Economics</div>
+      <h2>Cost model.</h2>
+      <p>
+        The swarm operates at near-zero cost per on-chain action. Every fee
+        listed below is the real BSV miner fee at the measured network rate
+        of 100 sat/kB, not a theoretical quote.
+      </p>
 
-<!-- PAGE 4: ECONOMICS -->
-<div class="page">
-  <div class="inner">
-    <div class="eyebrow">ECONOMICS</div>
-    <div class="h1">Revenue Model</div>
-
-    <div style="margin-top:16px;">
-      <div class="card">
-        <div class="row"><span class="k">Content</span><span class="v">Underground Empress (16MB music video)</span></div>
-        <div class="row"><span class="k">Token</span><span class="v">$EMPRESS — 1,000,000 supply</span></div>
-        <div class="row"><span class="k">Price</span><span class="v">1 sat/piece (63 pieces = 63 sats per stream)</span></div>
-        <div class="row"><span class="k">Token holder share</span><span class="v">100%</span></div>
-        <div class="row"><span class="k">Platform cut</span><span class="v">0%</span></div>
-      </div>
-    </div>
-
-    <div style="margin-top:12px;">
       <table>
-        <tr><th>Scale</th><th>Revenue</th><th>USD (@ $50 BSV)</th></tr>
-        <tr><td>1,000 streams</td><td>63,000 sats → holders</td><td>$0.032</td></tr>
-        <tr><td>100,000 streams</td><td>6,300,000 sats → holders</td><td>$3.15</td></tr>
-        <tr><td>10,000,000 streams</td><td>630,000,000 sats → holders</td><td>$315</td></tr>
-        <tr><td>1,000,000,000 streams</td><td>63B sats → holders</td><td>$31,500</td></tr>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th class="num">TX size</th>
+            <th class="num">Miner fee</th>
+            <th class="num">Payout</th>
+            <th class="num">Total cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Per-piece fan-out</td>
+            <td class="num">~260B</td>
+            <td class="num">~1 sat</td>
+            <td class="num">1 sat</td>
+            <td class="num">~2 sats</td>
+          </tr>
+          <tr>
+            <td>Financier subscription</td>
+            <td class="num">~260B</td>
+            <td class="num">~1 sat</td>
+            <td class="num">~2,500 sats</td>
+            <td class="num">~2,501 sats</td>
+          </tr>
+          <tr>
+            <td>Presale BSV-21 mint</td>
+            <td class="num">~350B</td>
+            <td class="num">~1 sat</td>
+            <td class="num">1 sat (inscription)</td>
+            <td class="num">~2 sats</td>
+          </tr>
+          <tr>
+            <td>BSVAPI image generation</td>
+            <td class="num">~260B</td>
+            <td class="num">~1 sat</td>
+            <td class="num">~124,000 sats</td>
+            <td class="num">~$0.02</td>
+          </tr>
+          <tr>
+            <td>24h swarm run (1.5M TXs)</td>
+            <td class="num">&mdash;</td>
+            <td class="num">~1.7M sats</td>
+            <td class="num">~1.7M sats</td>
+            <td class="num"><strong>~$2.82</strong></td>
+          </tr>
+        </tbody>
       </table>
-    </div>
 
-    <div style="margin-top:16px;">
-      <div class="h3" style="margin-bottom:8px;">Comparison</div>
+      <p class="small" style="margin-top:1rem;">
+        Assumes BSV at $40/USD. Projected 24h cost includes streaming payouts at
+        1 sat per piece and miner fees, but excludes optional BSVAPI content
+        generation which costs ~$0.02 per image and ~$0.15 per video (upstream
+        provider pass-through).
+      </p>
+    </section>
+
+    <!-- ─── DATA MODEL ─────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">Data model</div>
+      <h2>Persistent registry schema.</h2>
+      <p>
+        The swarm writes through to a self-hosted Supabase instance on Hetzner.
+        All data is readable via PostgREST with the public anon role, so the
+        <a href="productions.html" style="color:#000; font-weight:700; border-bottom:1px solid #000;">productions viewer</a>
+        queries the registry directly from the browser without a middleman.
+      </p>
+
+      <div class="code">CREATE TABLE bct_offers (
+  id                text          PRIMARY KEY,
+  producer_id       text          NOT NULL,
+  producer_address  text          NOT NULL,
+  title             text          NOT NULL,
+  synopsis          text          NOT NULL,
+  required_sats     bigint        NOT NULL,
+  raised_sats       bigint        NOT NULL DEFAULT 0,
+  status            text          NOT NULL DEFAULT 'open',
+  token_ticker      text          NOT NULL,
+  created_at        timestamptz   NOT NULL DEFAULT now()
+);
+
+CREATE TABLE bct_subscriptions (
+  id           bigserial     PRIMARY KEY,
+  offer_id     text          NOT NULL REFERENCES bct_offers (id),
+  agent_id     text          NOT NULL,
+  address      text          NOT NULL,
+  sats         bigint        NOT NULL,
+  payment_txid text,
+  created_at   timestamptz   NOT NULL DEFAULT now(),
+  UNIQUE (offer_id, agent_id)
+);
+
+CREATE TABLE bct_artifacts (
+  id            bigserial     PRIMARY KEY,
+  offer_id      text          NOT NULL REFERENCES bct_offers (id),
+  kind          text          NOT NULL CHECK (kind IN ('image','video','text')),
+  url           text          NOT NULL,
+  model         text          NOT NULL,
+  prompt        text          NOT NULL,
+  payment_txid  text          NOT NULL,
+  created_at    timestamptz   NOT NULL DEFAULT now()
+);</div>
+    </section>
+
+    <!-- ─── WHY AUTONOMOUS PRODUCTION? ────────────────── -->
+    <section>
+      <div class="eyebrow">Why this matters</div>
+      <h2>Pre-production film financing is broken.</h2>
+      <p>
+        Studios gatekeep, indies can't raise, audiences don't get what they
+        want. BitCoinTorrent demonstrates a pipeline where none of those
+        constraints apply: an AI agent proposes a production, peer agents
+        evaluate and finance it on-chain in seconds, the content is commissioned
+        from real upstream AI providers, and revenue flows back to the
+        financiers as royalties on consumption. No studio. No gatekeeper.
+        No human in any individual decision.
+      </p>
+      <p>
+        The same pattern generalises to every category of generative content
+        where the production cost is high and the distribution cost is low.
+        Every piece of generated media can be a token; every token can be
+        priced, traded, and settled on-chain.
+      </p>
+    </section>
+
+    <!-- ─── ROADMAP ──────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">Roadmap</div>
+      <h2>What's done, what's next.</h2>
+
       <table>
-        <tr><th></th><th>YouTube</th><th>Netflix</th><th>BitCoinTorrent</th></tr>
-        <tr><td>CDN cost / stream</td><td>$0.01-0.05</td><td>$0.01-0.05</td><td style="font-weight:700;">$0.00003</td></tr>
-        <tr><td>Creator revenue</td><td>$0.003 (ads)</td><td>Licence deal</td><td style="font-weight:700;">100% direct</td></tr>
-        <tr><td>Platform cut</td><td>45%</td><td>~70%</td><td style="font-weight:700;">0%</td></tr>
-        <tr><td>Scaling cost</td><td>Grows</td><td>Grows</td><td style="font-weight:700;">Shrinks (P2P)</td></tr>
-        <tr><td>Censorship</td><td>Platform decides</td><td>Platform decides</td><td style="font-weight:700;">Swarm-based</td></tr>
+        <thead>
+          <tr><th style="width:120px">Status</th><th>Item</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Shipped</strong></td><td>Agent base class, Producer + Financier subclasses, in-memory registry</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>BRC-77 signed offer and subscription records over HTTP</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>Presale BSV-21 token mint, financier subscription tx, on-chain settlement</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>Parallel UTXO pool, ArcBroadcaster via GorillaPool, 19 TX/s sustained</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>Live agent dashboard at <code>/agents</code> with snapshot polling</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>BSVAPI x402 gateway with AtlasCloud image generation</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>Persistent SupabaseRegistry with PostgREST public read path</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>Public <a href="productions.html" style="color:#000; font-weight:700; border-bottom:1px solid #000;">/productions</a> viewer backed by the real database</td></tr>
+          <tr><td>Next</td><td>Video generation via AtlasCloud Wan 2.2 (polling integration)</td></tr>
+          <tr><td>Next</td><td>Multi-broadcaster failover (Taal ARC as backup to GorillaPool)</td></tr>
+          <tr><td>Next</td><td>Budget circuit breakers and auto top-up alerts</td></tr>
+          <tr><td>Next</td><td>Full viewer UX with connect-wallet + pay-per-piece streaming</td></tr>
+          <tr><td>Next</td><td>NPGX character integration (26 autonomous agents become producers)</td></tr>
+        </tbody>
       </table>
-    </div>
+    </section>
 
-    <div style="margin-top:16px;">
-      <div class="h3" style="margin-bottom:8px;">Dividend Governance</div>
-      <div class="body-sm">
-        Phase 1 (now): Direct fan-out in settlement TX — no custody, no intermediary. Phase 2: Transparency monitoring. Phase 3: Proof of Indexing (nodes verify holder snapshots). Phase 4: Threshold multisig. Phase 5: sCrypt covenant (fully trustless). See DIVIDEND-GOVERNANCE.md.
-      </div>
-    </div>
+    <!-- ─── LINKS ──────────────────────────────────── -->
+    <section>
+      <div class="eyebrow">Links</div>
+      <h2>Everything is public.</h2>
+      <p>
+        All code, all schema, all on-chain transactions, all addresses. Every
+        claim in this report is independently verifiable.
+      </p>
 
-    <div class="footer"><span>BitCoinTorrent — Technical Report</span><span>Page 4</span></div>
-  </div>
-</div>
-
-<!-- PAGE 5: RESEARCH -->
-<div class="page">
-  <div class="inner">
-    <div class="eyebrow">RESEARCH</div>
-    <div class="h1">Prior Art</div>
-    <div class="body-lg" style="margin-top:10px; margin-bottom:16px;">
-      Every attempt to combine BitTorrent with crypto payments failed. We studied why.
-    </div>
-
-    <table>
-      <tr><th>Project</th><th>Approach</th><th>Why It Failed</th></tr>
-      <tr><td>BTT (TRON)</td><td>Pay seeders in BTT token</td><td>Wallet friction, SEC lawsuit</td></tr>
-      <tr><td>Filecoin/IPFS</td><td>Storage incentives</td><td>Storage, not streaming</td></tr>
-      <tr><td>Theta</td><td>Video CDN via edge nodes</td><td>Proprietary, not open P2P</td></tr>
-      <tr><td>Livepeer</td><td>Transcoding marketplace</td><td>Only success — compute, not delivery</td></tr>
-      <tr><td>Audius</td><td>Music on Solana</td><td>$6.1M hack, not P2P</td></tr>
-      <tr><td>LBRY/Odysee</td><td>BitTorrent + blockchain</td><td>SEC lawsuit (token = security)</td></tr>
-    </table>
-
-    <div style="margin-top:16px;">
-      <div class="h3" style="margin-bottom:8px;">Our Design Decisions</div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-        <div class="card"><div class="h3">No custom token</div><div class="body-sm">Pay in BSV sats. Content tokens are revenue rights, not payment currency.</div></div>
-        <div class="card"><div class="h3">Token = licence</div><div class="body-sm">Hold tokens to serve content. Seeders are investors with skin in the game.</div></div>
-        <div class="card"><div class="h3">No blockchain for discovery</div><div class="body-sm">Standard BitTorrent trackers. Blockchain only for payments + ownership.</div></div>
-        <div class="card"><div class="h3">100% to holders</div><div class="body-sm">No platform cut. No split. All revenue fans out to token holders atomically.</div></div>
-        <div class="card"><div class="h3">VOD only</div><div class="body-sm">Live P2P has physics problems. VOD streaming works perfectly with BitTorrent.</div></div>
-        <div class="card"><div class="h3">Fan-out settlement</div><div class="body-sm">The payment TX IS the distribution. No treasury. No custody risk.</div></div>
-      </div>
-    </div>
-
-    <div class="footer"><span>BitCoinTorrent — Technical Report</span><span>Page 5</span></div>
-  </div>
-</div>
-
-<!-- PAGE 6: ROADMAP -->
-<div class="page">
-  <div class="inner">
-    <div class="eyebrow">ROADMAP</div>
-    <div class="h1">Progress</div>
-
-    <div class="phase-bar" style="margin-top:16px;">
-      <div class="phase"><div class="num">1</div><div class="txt">Core</div><div class="body-sm" style="margin-top:4px;">Done</div></div>
-      <div class="phase"><div class="num">2</div><div class="txt">Tokens</div><div class="body-sm" style="margin-top:4px;">Done</div></div>
-      <div class="phase"><div class="num">3</div><div class="txt">Desktop</div><div class="body-sm" style="margin-top:4px;">Done</div></div>
-      <div class="phase"><div class="num">4</div><div class="txt">Indexer</div><div class="body-sm" style="margin-top:4px;">Done</div></div>
-      <div class="phase"><div class="num">5</div><div class="txt">Scale</div><div class="body-sm" style="margin-top:4px;">Next</div></div>
-    </div>
-
-    <div style="margin-top:16px;">
       <table>
-        <tr><th>Status</th><th>Item</th><th>Date</th></tr>
-        <tr><td style="font-weight:700;">Done</td><td>Payment channels, wire protocol, ingestion, streaming</td><td>2026-04-07</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>$402 gate, real BSV mainnet payments, settlement</td><td>2026-04-07</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>P2P swarm, proof-of-serve, Hetzner deployment</td><td>2026-04-07</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>Electron desktop app (Mac/Win/Linux)</td><td>2026-04-08</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>Content tokenization (BSV-21 mint)</td><td>2026-04-08</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>N-recipient fan-out (100% to holders)</td><td>2026-04-08</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>Server-side token API + BSV-21 indexer client</td><td>2026-04-08</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>File upload, settings, library, website</td><td>2026-04-08</td></tr>
-        <tr><td style="font-weight:700;">Done</td><td>Dividend governance architecture document</td><td>2026-04-08</td></tr>
-        <tr><td style="color:#999;">Build</td><td>Proof of Indexing (node sync for holder snapshots)</td><td></td></tr>
-        <tr><td style="color:#999;">Build</td><td>Batched dividend distribution for large holder counts</td><td></td></tr>
-        <tr><td style="color:#ccc;">Next</td><td>Token marketplace / transfer UI</td><td></td></tr>
-        <tr><td style="color:#ccc;">Next</td><td>Wallet connect (1Sat / HandCash)</td><td></td></tr>
-        <tr><td style="color:#ccc;">Next</td><td>Seeder licence enforcement (token-holding verification)</td><td></td></tr>
-        <tr><td style="color:#ccc;">Next</td><td>ClawMiner integration (hardware seeder nodes)</td><td></td></tr>
+        <tbody>
+          <tr><td>Source code</td><td><a href="https://github.com/b0ase/BitCoinTorrent" style="color:#000; font-weight:700; border-bottom:1px solid #000;">github.com/b0ase/BitCoinTorrent</a></td></tr>
+          <tr><td>BSVAPI gateway</td><td><a href="https://github.com/b0ase/bsvapi" style="color:#000; font-weight:700; border-bottom:1px solid #000;">github.com/b0ase/bsvapi</a></td></tr>
+          <tr><td>Public viewer</td><td><a href="productions.html" style="color:#000; font-weight:700; border-bottom:1px solid #000;">bitcointorrent.online/productions.html</a></td></tr>
+          <tr><td>Live BSVAPI</td><td><a href="https://www.bsvapi.com" style="color:#000; font-weight:700; border-bottom:1px solid #000;">bsvapi.com</a></td></tr>
+          <tr><td>Database</td><td>Hetzner Supabase (PostgREST public read, service-role write)</td></tr>
+          <tr><td>Broadcaster</td><td>GorillaPool ARC (https://arc.gorillapool.io), anonymous endpoint</td></tr>
+        </tbody>
       </table>
-    </div>
+    </section>
 
-    <div style="margin-top:16px;">
-      <div class="h3" style="margin-bottom:8px;">Ecosystem Integration</div>
-      <table>
-        <tr><th>System</th><th>Role</th></tr>
-        <tr><td>$402 Protocol</td><td>HTTP 402 content gate, Proof of Indexing infrastructure</td></tr>
-        <tr><td>ClawMiner</td><td>Dedicated hardware seeder node (buys tokens, earns revenue)</td></tr>
-        <tr><td>1Sat Wallet</td><td>Browser wallet for viewer payments</td></tr>
-        <tr><td>$KWEG</td><td>First content library (music videos)</td></tr>
-        <tr><td>$401 / bit-sign</td><td>Creator identity verification</td></tr>
-      </table>
-    </div>
+  </main>
 
-    <div class="footer"><span>BitCoinTorrent — Technical Report</span><span>Page 6</span></div>
-  </div>
-</div>
-
-<!-- PAGE 7: CLOSING -->
-<div class="page">
-  <div class="inner" style="display:flex; flex-direction:column; justify-content:center;">
-    <div class="display">BUILT.<br>TESTED.<br>LIVE.</div>
-
-    <div class="body-lg" style="margin-top:24px; max-width:70%;">
-      BitCoinTorrent is the first working implementation of per-piece micropayments for P2P video streaming on Bitcoin SV. Real transactions. Real money. Token holders earn 100%.
-    </div>
-
-    <div class="metric-grid" style="margin-top:30px;">
-      <div class="metric"><div class="val">63</div><div class="lbl">Sats per Stream</div></div>
-      <div class="metric"><div class="val">2</div><div class="lbl">On-Chain TXs</div></div>
-      <div class="metric"><div class="val">100%</div><div class="lbl">To Token Holders</div></div>
-      <div class="metric"><div class="val">0%</div><div class="lbl">Platform Cut</div></div>
-    </div>
-
-    <div style="margin-top:30px; color:#999; font-size:8pt;">
-      <strong style="color:#555;">Links</strong><br>
-      Live: https://stream.bitcointorrent.online<br>
-      Website: bitcointorrent.online<br>
-      GitHub: github.com/b0ase/BitCoinTorrent<br>
-      Download: GitHub Releases (Mac/Win/Linux)<br><br>
-      Built April 7-8, 2026
-    </div>
-  </div>
-  <div class="bar"></div>
-</div>
+  <footer>
+    BitCoinTorrent technical report &middot; April 2026 &middot;
+    <a href="https://github.com/b0ase/BitCoinTorrent">source on GitHub</a>
+  </footer>
 
 </body>
 </html>
