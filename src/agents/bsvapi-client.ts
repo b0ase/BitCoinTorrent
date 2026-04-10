@@ -172,28 +172,45 @@ export class BsvapiClient {
       throw new Error(`BSVAPI payment broadcast failed: ${broadcastResult.error}`);
     }
 
-    // Retry the original request with the txid in the header
-    const retry = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-bsv-payment': broadcastResult.txid,
-      },
-      body: JSON.stringify(body),
-    });
-    if (retry.status !== 200) {
-      const text = await retry.text().catch(() => '');
-      throw new Error(
-        `BSVAPI ${path} retry after payment returned ${retry.status}: ${text.slice(0, 400)}`,
-      );
+    // Retry the original request with the txid in the header.
+    // There is a propagation lag between broadcasting via ARC
+    // (GorillaPool) and WhatsOnChain's indexer seeing the tx.
+    // BSVAPI currently verifies via WoC, so we give the indexer
+    // a few seconds and retry on "not found" responses.
+    const retryDelays = [2000, 3000, 4000, 6000];
+    let lastBody = '';
+    let lastStatus = 0;
+    for (let i = 0; i <= retryDelays.length; i++) {
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, retryDelays[i - 1]));
+      }
+      const retry = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-bsv-payment': broadcastResult.txid,
+        },
+        body: JSON.stringify(body),
+      });
+      if (retry.status === 200) {
+        return {
+          status: 'ok',
+          body: (await retry.json()) as T,
+          paymentTxid: broadcastResult.txid,
+          satoshisPaid: totalPay,
+        };
+      }
+      lastStatus = retry.status;
+      lastBody = (await retry.text().catch(() => '')).slice(0, 400);
+      // Only retry if the server's complaint is "not found on-chain".
+      // Anything else (malformed, insufficient, replay) is permanent.
+      if (!/not found on-chain/i.test(lastBody)) {
+        break;
+      }
     }
-
-    return {
-      status: 'ok',
-      body: (await retry.json()) as T,
-      paymentTxid: broadcastResult.txid,
-      satoshisPaid: totalPay,
-    };
+    throw new Error(
+      `BSVAPI ${path} retry after payment (tx ${broadcastResult.txid}) returned ${lastStatus}: ${lastBody}`,
+    );
   }
 
   /**
