@@ -16,7 +16,7 @@
     nav a:hover { color: #000; }
     nav a.active { color: #000; border-color: #000; }
     main {
-      max-width: 800px; margin: 0 auto; padding: 4rem 3rem;
+      max-width: 1400px; margin: 0 auto; padding: 4rem 3rem;
       display: flex; flex-direction: column; align-items: center; text-align: center;
     }
     .hero-title {
@@ -40,15 +40,15 @@
     .stats span { color: #000; font-weight: 700; }
 
     .hero-head {
-      font-size: 3rem; font-weight: 900; letter-spacing: -0.03em;
-      line-height: 0.95; text-transform: uppercase; max-width: 720px;
+      font-size: 3.6rem; font-weight: 900; letter-spacing: -0.03em;
+      line-height: 0.95; text-transform: uppercase; max-width: 1100px;
     }
     .hero-sub {
-      font-size: 0.95rem; color: #555; line-height: 1.6; margin-top: 1.2rem;
-      max-width: 620px;
+      font-size: 1rem; color: #555; line-height: 1.6; margin-top: 1.2rem;
+      max-width: 900px;
     }
     section {
-      padding: 4rem 3rem; max-width: 800px; margin: 0 auto;
+      padding: 4rem 3rem; max-width: 1400px; margin: 0 auto;
       border-top: 2px solid #000;
     }
     .eyebrow {
@@ -60,8 +60,14 @@
       letter-spacing: -0.02em; line-height: 1; margin-bottom: 2rem;
     }
     .steps {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5rem;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.5rem;
       margin-top: 2rem;
+    }
+    @media (max-width: 960px) {
+      .steps { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .steps { grid-template-columns: 1fr; }
     }
     .step .n {
       font-size: 0.7rem; font-weight: 900; letter-spacing: 0.05em;
@@ -100,7 +106,6 @@
     }
     .cta a:hover { background: #f0f0f0; }
     @media (max-width: 720px) {
-      .steps { grid-template-columns: 1fr; gap: 2rem; }
       .cat-row { grid-template-columns: 1fr; gap: 0.3rem; }
       .hero-head { font-size: 2.2rem; }
     }
@@ -189,7 +194,7 @@
     // 3-row teaser linking through.
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.103.0';
     const SUPABASE_URL = 'https://api.b0ase.com';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0aHBlZHl3Z3dweWdyZnFsaXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1NTMwODMsImV4cCI6MjA2NjEyOTA4M30.2ud57kHQQ7l8c737t5lDeJkhsOeQSed4MIR42PnzRAg';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY3Mzk3ODYzLCJleHAiOjE5MjUwNzc4NjN9.dJlnc64RLPA1jwDaPk8gA1suwnBn7r0I5L5eojM3Iig';
     const el = document.getElementById('cat-list');
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
