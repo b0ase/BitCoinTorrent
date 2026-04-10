@@ -80,24 +80,38 @@ Four agents × $1 ≈ **~1M sats per wallet at current BSV price**. That is enou
 
 ## 4. Transaction-Volume Math for the 1.5M Target
 
-The hackathon requires **1.5M on-chain TXs in a designated 24-hour window**. Breakdown of where TXs come from in the agentic pipeline:
+The hackathon requires **1.5M on-chain TXs in a designated 24-hour window**. The dominant source by a wide margin is **per-piece fan-out payments** (see `src/agents/piece-payment.ts`): every piece of content served produces exactly one real on-chain transaction whose outputs fan out to every token holder in a single tx.
 
-| Source | TX shape | Rate assumption | 24h TX count |
+Concretely: 4 concurrent streaming loops × 5 pieces per second per loop × 86 400 seconds = **1 728 000 fan-out TXs in 24 hours**, 115% of the 1.5M target. Tuning is done with `pnpm agents:math -- --loops N --pps N --sats-per-piece N` which prints projections and cost before any real spend.
+
+| Source | TX shape | Rate | 24h TX count |
 |---|---|---|---|
-| Producer mints financing token | 1 × BSV-21 mint per production | 20 productions / day | 20 |
-| Financier subscription transfers | 1 × P2PKH transfer per subscription | 3 financiers × 20 productions | 60 |
-| Payment-channel settlement per completed stream | 1 × N-output fan-out TX, 1 per stream | 500 streams / hour × 24 = 12 000 | 12 000 |
-| Piece-level payment-channel updates | 1 × channel update per piece, ~1000 pieces per stream | 12 000 streams × ~125 kept updates | **1 500 000** |
+| Streaming fan-out | 1 TX with (holders + 1) P2PKH outputs | 4 loops × 5 pps = 20 TX/s | **1 728 000** |
+| Presale token mints | 1 BSV-21 deploy+mint per production | ~20 / hour | 480 |
+| Subscription payments | 1 P2PKH transfer per subscription | ~60 / hour | 1 440 |
+| **Total** | | | **1 729 920** |
 
-**The dominant source is payment-channel updates.** Each piece of content streamed produces a signed channel update transaction. BitCoinTorrent already tracks these per-piece. To hit 1.5M we broadcast the keepers (every Nth update) rather than only the final settlement. At 1 000 pieces per stream and keeping every 10th update = 100 on-chain TXs per stream, times 15 000 streams in the window = 1.5M.
+Every fan-out TX is meaningful work: it is a real payment from the viewer (ClawNode-A seeder) to every token holder of the production being streamed, weighted by their subscription amount. There is no artificial inflation — each TX corresponds to one piece of content genuinely served, one payment settled, one royalty distribution happening on-chain.
 
-Tuning knobs (Task 8):
-- Piece size (smaller → more pieces → more TXs)
-- Stream concurrency (more agents streaming in parallel)
-- Keep-every-N-updates (smaller N → more TXs but higher cost)
-- Stream count in 24h (agents pick new content more often)
+Cost at 1 sat per fee (P2PKH ~260 bytes rounds to 1 sat at 1 sat/KB) and 1 sat per piece payout:
 
-This is explicitly NOT artificial inflation: every TX is a real payment-channel update tied to a real piece of content served. The "meaningful to app functionality" criterion is met because without the update the seeder has no proof of service and no payment claim.
+| Component | Sats | USD @ $40/BSV |
+|---|---|---|
+| Streaming miner fees (1.73M × 1 sat) | 1 728 000 | $0.69 |
+| Streaming payouts (1.73M × 1 sat) | 1 728 000 | $0.69 |
+| Presale mint fees | 480 | $0.00 |
+| Subscription fees | 1 440 | $0.00 |
+| Subscription capital (60 × 24 × 2 500) | 3 600 000 | $1.44 |
+| **Total** | **7 057 920** | **≈ $2.82** |
+
+Well inside the $16 (4 agents × $4) budget. If BSV price is higher or fee rates rise, bump satsPerPiece toward 2-3 to stay comfortable.
+
+Tuning knobs:
+- `--loops` : more concurrent streaming loops (higher TX rate)
+- `--pps`   : pieces per second per loop (higher TX rate)
+- `--sats-per-piece` : payout per piece (dominates the cost line)
+
+These are all exposed on both `pnpm agents:math` (projection) and `pnpm agents:swarm` (live run).
 
 ## 5. Build Phases
 
