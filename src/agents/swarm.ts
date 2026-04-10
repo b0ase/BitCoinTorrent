@@ -177,7 +177,9 @@ export function buildSwarm(
                   const url =
                     res.body.url ??
                     res.body.output ??
-                    (Array.isArray(res.body.outputs) && res.body.outputs[0]) ||
+                    (Array.isArray(res.body.outputs)
+                      ? res.body.outputs[0]
+                      : undefined) ??
                     '';
                   if (!url) {
                     throw new Error(
