@@ -9,7 +9,7 @@
  * caring which one is active.
  */
 
-import { ARC, FetchHttpClient, type Transaction } from '@bsv/sdk';
+import { ARC, FetchHttpClient, isBroadcastResponse, type Transaction } from '@bsv/sdk';
 import type { Wallet } from './wallet.js';
 import type { BroadcastResult } from '../types/payment.js';
 
@@ -66,17 +66,19 @@ export class ArcBroadcaster implements TxBroadcaster {
   async broadcast(tx: Transaction): Promise<BroadcastResult> {
     try {
       const result = await this.arc.broadcast(tx);
-      if ('txid' in result && result.txid) {
+      // CRITICAL: ARC includes a `txid` field in error responses too
+      // (e.g. fee-too-low, mempool-conflict). Using isBroadcastResponse
+      // as the source of truth instead of presence of txid prevents
+      // silently claiming success on a rejected broadcast.
+      if (isBroadcastResponse(result)) {
         return { txid: result.txid, success: true };
       }
-      // result is BroadcastFailure
-      const errMsg =
-        'description' in result
-          ? result.description
-          : ('more' in result && typeof result.more === 'string'
-              ? result.more
-              : 'unknown ARC failure');
-      return { txid: '', success: false, error: `ARC: ${errMsg}` };
+      const code = result.code ? `[${result.code}] ` : '';
+      return {
+        txid: '',
+        success: false,
+        error: `ARC: ${code}${result.description ?? 'unknown ARC failure'}`,
+      };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { txid: '', success: false, error: `ARC threw: ${msg}` };

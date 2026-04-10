@@ -9,8 +9,8 @@
  * { "p": "bsv-20", "op": "deploy+mint", "tick": "$TICKER", "max": "N", "amt": "N" }
  */
 
-import { PrivateKey, Transaction, P2PKH, Script, SatoshisPerKilobyte } from '@bsv/sdk';
-import { Wallet } from '../payment/wallet.js';
+import { PrivateKey, Transaction, P2PKH, Script } from '@bsv/sdk';
+import { Wallet, NETWORK_FEE_MODEL } from '../payment/wallet.js';
 import type { ContentToken } from './types.js';
 import type { ContentManifest } from '../types/torrent.js';
 
@@ -125,7 +125,7 @@ export async function mintContentToken(opts: MintOptions): Promise<ContentToken>
     // Output 1: change back to creator
     tx.addP2PKHOutput(wallet.address);
 
-    await tx.fee(new SatoshisPerKilobyte(1));
+    await tx.fee(NETWORK_FEE_MODEL);
     await tx.sign();
 
     // Broadcast
@@ -157,7 +157,7 @@ export async function mintContentToken(opts: MintOptions): Promise<ContentToken>
     });
 
     tx.addP2PKHOutput(wallet.address);
-    await tx.fee(new SatoshisPerKilobyte(1));
+    await tx.fee(NETWORK_FEE_MODEL);
     await tx.sign();
 
     deployTxid = tx.id('hex');

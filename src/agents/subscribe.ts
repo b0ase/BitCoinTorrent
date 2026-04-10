@@ -16,8 +16,8 @@
  * step is handled by the caller via HttpRegistryClient.subscribe.
  */
 
-import { Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
-import { Wallet } from '../payment/wallet.js';
+import { Transaction, P2PKH } from '@bsv/sdk';
+import { Wallet, NETWORK_FEE_MODEL } from '../payment/wallet.js';
 import type { ProductionOffer } from './registry.js';
 
 export interface SubscriptionReceipt {
@@ -55,7 +55,7 @@ export async function buildSubscriptionTx(
   tx.addP2PKHOutput(offer.producerAddress, sats);
   // Output 1: change back to financier (fee() will balance)
   tx.addP2PKHOutput(financier.address);
-  await tx.fee(new SatoshisPerKilobyte(1));
+  await tx.fee(NETWORK_FEE_MODEL);
   await tx.sign();
   return tx;
 }

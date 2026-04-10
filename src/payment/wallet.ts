@@ -11,6 +11,21 @@ import type { UTXO, BroadcastResult } from '../types/payment.js';
 const WOC_BASE = 'https://api.whatsonchain.com/v1/bsv/main';
 
 /**
+ * Fee rate in satoshis per kilobyte. Theoretical BSV network
+ * minimum is 1 sat/KB, but real-world relay policies enforce a
+ * higher floor: GorillaPool ARC currently requires at least ~50
+ * sat/KB and Taal ARC is similar. At 100 sat/KB a typical P2PKH
+ * tx of ~260 bytes costs ~26 sats — comfortably above every ARC
+ * minimum we have seen while staying well under a cent.
+ *
+ * Import this constant anywhere you construct a SatoshisPerKilobyte
+ * to keep the fee policy consistent across the repo.
+ */
+export const NETWORK_FEE_SATS_PER_KB = 100;
+
+export const NETWORK_FEE_MODEL = new SatoshisPerKilobyte(NETWORK_FEE_SATS_PER_KB);
+
+/**
  * Retry a fetch with exponential backoff when the response is 429
  * (rate-limited) or a transient 5xx. The decision to retry is made
  * on the HTTP response itself, so fetch-level exceptions (DNS, abort)

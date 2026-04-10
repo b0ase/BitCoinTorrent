@@ -14,8 +14,8 @@
  *   pnpm tsx scripts/fund-viewer.ts capitalk clawnode-a 40000000
  */
 
-import { Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
-import { Wallet } from '../src/payment/wallet.js';
+import { Transaction, P2PKH } from '@bsv/sdk';
+import { Wallet, NETWORK_FEE_MODEL } from '../src/payment/wallet.js';
 import { loadAgentConfig } from '../src/agents/config.js';
 
 async function main() {
@@ -73,7 +73,7 @@ async function main() {
   });
   tx.addP2PKHOutput(toAddress, sats);
   tx.addP2PKHOutput(fromWallet.address);
-  await tx.fee(new SatoshisPerKilobyte(1));
+  await tx.fee(NETWORK_FEE_MODEL);
   await tx.sign();
 
   const result = await fromWallet.broadcast(tx);

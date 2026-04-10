@@ -25,12 +25,8 @@
  * surface a thrown error on every non-200 that is not a 402.
  */
 
-import {
-  Transaction,
-  P2PKH,
-  SatoshisPerKilobyte,
-} from '@bsv/sdk';
-import type { Wallet } from '../payment/wallet.js';
+import { Transaction, P2PKH } from '@bsv/sdk';
+import { NETWORK_FEE_MODEL, type Wallet } from '../payment/wallet.js';
 import type { TxBroadcaster } from '../payment/broadcaster.js';
 
 export interface BsvapiClientOptions {
@@ -256,7 +252,7 @@ export class BsvapiClient {
     });
     tx.addP2PKHOutput(payToAddress, satoshis);
     tx.addP2PKHOutput(this.wallet.address);
-    await tx.fee(new SatoshisPerKilobyte(1));
+    await tx.fee(NETWORK_FEE_MODEL);
     await tx.sign();
     return tx;
   }

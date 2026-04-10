@@ -30,8 +30,8 @@
  * for the final broadcast.
  */
 
-import { Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
-import type { Wallet } from '../payment/wallet.js';
+import { Transaction, P2PKH } from '@bsv/sdk';
+import { NETWORK_FEE_MODEL, type Wallet } from '../payment/wallet.js';
 import type { TxBroadcaster } from '../payment/broadcaster.js';
 
 export interface UtxoSlot {
@@ -176,7 +176,7 @@ export class UtxoPool {
     }
     // Change back to viewer — fee() will balance
     splitTx.addP2PKHOutput(wallet.address);
-    await splitTx.fee(new SatoshisPerKilobyte(1));
+    await splitTx.fee(NETWORK_FEE_MODEL);
     await splitTx.sign();
 
     const result = broadcaster

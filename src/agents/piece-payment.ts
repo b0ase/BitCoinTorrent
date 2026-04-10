@@ -23,8 +23,8 @@
  *                           broadcasts; used by the streaming loop.
  */
 
-import { Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
-import { Wallet } from '../payment/wallet.js';
+import { Transaction, P2PKH } from '@bsv/sdk';
+import { Wallet, NETWORK_FEE_MODEL } from '../payment/wallet.js';
 import type { UtxoPool, UtxoSlot } from './utxo-pool.js';
 import type { TxBroadcaster } from '../payment/broadcaster.js';
 
@@ -119,7 +119,7 @@ export async function buildPiecePaymentTx(
   }
   // Change output back to viewer — fee() will balance
   tx.addP2PKHOutput(viewer.address);
-  await tx.fee(new SatoshisPerKilobyte(1));
+  await tx.fee(NETWORK_FEE_MODEL);
   await tx.sign();
   return tx;
 }

@@ -19,13 +19,8 @@
  *                           broadcasts. Used by the live swarm.
  */
 
-import {
-  Transaction,
-  P2PKH,
-  Script,
-  SatoshisPerKilobyte,
-} from '@bsv/sdk';
-import { Wallet } from '../payment/wallet.js';
+import { Transaction, P2PKH, Script } from '@bsv/sdk';
+import { Wallet, NETWORK_FEE_MODEL } from '../payment/wallet.js';
 import type { ProductionOffer } from '../agents/registry.js';
 
 export interface PresaleToken {
@@ -112,7 +107,7 @@ export async function buildPresaleMintTx(
   tx.addOutput({ lockingScript: script, satoshis: 1 });
   // Output 1: change back to producer
   tx.addP2PKHOutput(wallet.address);
-  await tx.fee(new SatoshisPerKilobyte(1));
+  await tx.fee(NETWORK_FEE_MODEL);
   await tx.sign();
   return tx;
 }
