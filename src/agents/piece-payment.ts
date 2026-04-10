@@ -26,6 +26,7 @@
 import { Transaction, P2PKH, SatoshisPerKilobyte } from '@bsv/sdk';
 import { Wallet } from '../payment/wallet.js';
 import type { UtxoPool, UtxoSlot } from './utxo-pool.js';
+import type { TxBroadcaster } from '../payment/broadcaster.js';
 
 export interface TokenHolderShare {
   address: string;
@@ -142,8 +143,16 @@ export async function broadcastPiecePaymentPooled(opts: {
   holders: TokenHolderShare[];
   satsPerPiece: number;
   pool: UtxoPool;
+  /**
+   * Optional alternative broadcaster (e.g. an ArcBroadcaster). When
+   * provided it is used instead of viewer.broadcast(), routing the
+   * transaction through Taal ARC or another endpoint. The default
+   * path (no broadcaster) still uses wallet.broadcast() which hits
+   * WhatsOnChain.
+   */
+  broadcaster?: TxBroadcaster;
 }): Promise<PieceReceipt> {
-  const { viewer, holders, satsPerPiece, pool } = opts;
+  const { viewer, holders, satsPerPiece, pool, broadcaster } = opts;
   if (satsPerPiece <= 0) throw new Error('satsPerPiece must be > 0');
   if (holders.length === 0) throw new Error('holders must be non-empty');
 
@@ -167,7 +176,9 @@ export async function broadcastPiecePaymentPooled(opts: {
     throw err;
   }
 
-  const result = await viewer.broadcast(tx);
+  const result = broadcaster
+    ? await broadcaster.broadcast(tx)
+    : await viewer.broadcast(tx);
   if (!result.success) {
     pool.release(slot);
     throw new Error(`Piece broadcast failed: ${result.error}`);

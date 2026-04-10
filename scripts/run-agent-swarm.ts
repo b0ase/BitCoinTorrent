@@ -38,6 +38,7 @@ import { registerDashboardRoutes } from '../src/agents/dashboard-routes.js';
 import { StreamingLoop } from '../src/agents/streaming-loop.js';
 import type { TokenHolderShare } from '../src/agents/piece-payment.js';
 import { UtxoPool } from '../src/agents/utxo-pool.js';
+import { ArcBroadcaster, type TxBroadcaster } from '../src/payment/broadcaster.js';
 
 function parseFlags(argv: string[]): Record<string, string | boolean> {
   const out: Record<string, string | boolean> = {};
@@ -70,6 +71,19 @@ async function main() {
       : undefined;
   const maxInflight = Number(flags.inflight ?? 3);
   const maxOpenOffers = Number(flags['max-offers'] ?? 5);
+
+  // Prefer Taal ARC for piece broadcasts when a key is available.
+  // Env: TAAL_ARC_API_KEY=mainnet_xxxxxxxxxxxxxxxx...
+  // Falls back to the viewer's own wallet.broadcast() (WhatsOnChain)
+  // when no key is set.
+  let pieceBroadcaster: TxBroadcaster | undefined;
+  const arcKey = process.env.TAAL_ARC_API_KEY;
+  if (arcKey && arcKey.length > 0) {
+    pieceBroadcaster = new ArcBroadcaster({ apiKey: arcKey });
+    console.log(`Piece broadcaster: Taal ARC (key: ${arcKey.slice(0, 12)}...)`);
+  } else {
+    console.log('Piece broadcaster: WhatsOnChain (default, no TAAL_ARC_API_KEY set)');
+  }
 
   const config = await loadAgentConfig();
   if (!config) {
@@ -177,6 +191,7 @@ async function main() {
       piecesPerSecond,
       maxInflight,
       pool,
+      txBroadcaster: pieceBroadcaster,
       onPiece: (receipt) => {
         pieceTxCount++;
         totalSatsDistributed += receipt.satsPerPiece;

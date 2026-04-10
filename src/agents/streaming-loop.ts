@@ -23,6 +23,7 @@ import {
   type PieceReceipt,
 } from './piece-payment.js';
 import type { UtxoPool } from './utxo-pool.js';
+import type { TxBroadcaster } from '../payment/broadcaster.js';
 
 export interface StreamingLoopOptions {
   viewer: Wallet;
@@ -55,6 +56,13 @@ export interface StreamingLoopOptions {
    * piece. Strongly recommended for any sustained run.
    */
   pool?: UtxoPool;
+  /**
+   * Optional alternative broadcaster (e.g. ArcBroadcaster). Used
+   * only when `pool` is also set. When omitted, piece TXs are
+   * broadcast via the viewer wallet's own .broadcast() method,
+   * which hits WhatsOnChain.
+   */
+  txBroadcaster?: TxBroadcaster;
   /**
    * Optional callback the loop calls INSTEAD of broadcastPiecePayment.
    * Used by unit tests to avoid network traffic. When provided, the
@@ -165,6 +173,7 @@ export class StreamingLoop {
         holders: this.opts.holders,
         satsPerPiece: this.opts.satsPerPiece,
         pool: this.opts.pool,
+        broadcaster: this.opts.txBroadcaster,
       });
     } else {
       receipt = await broadcastPiecePayment({
