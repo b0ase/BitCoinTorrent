@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="/env.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BitCoinTorrent — Productions</title>
@@ -161,7 +162,7 @@
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.103.0';
 
     const SUPABASE_URL = 'https://api.b0ase.com';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY3Mzk3ODYzLCJleHAiOjE5MjUwNzc4NjN9.dJlnc64RLPA1jwDaPk8gA1suwnBn7r0I5L5eojM3Iig';
+    const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

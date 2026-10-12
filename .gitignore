@@ -16,3 +16,6 @@ electron/main.mjs
 electron/main.mjs.map
 electron/preload.js
 electron/preload.js.map
+
+# generated at build from env (scripts/write-env-js.mjs) - never commit
+/docs/brochure/env.js

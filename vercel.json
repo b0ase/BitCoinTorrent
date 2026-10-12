@@ -1,5 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "echo 'This is an Electron desktop app, not a web app. See GitHub releases for downloads.'",
-  "outputDirectory": "docs/brochure"
+  "buildCommand": "node scripts/write-env-js.mjs docs/brochure",
+  "outputDirectory": "docs/brochure",
+  "headers": [
+    {
+      "source": "/env.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate, s-maxage=300"
+        }
+      ]
+    }
+  ]
 }
